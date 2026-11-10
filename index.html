@@ -2568,11 +2568,11 @@ main { min-height: 0; }
       
       html += `
         <tr style="background:#faf3e8;">
-          <td><strong>${bodAccount.code || 'BOD'}</strong></td>
-          <td><strong>${bodAccount.phone}</strong></td>
-          <td>${bodAccount.name}</td>
+          <td><strong>${escHtmlOnline(bodAccount.code || 'BOD')}</strong></td>
+          <td><strong>${escHtmlOnline(bodAccount.phone)}</strong></td>
+          <td>${escHtmlOnline(bodAccount.name)}</td>
           <td>🔒</td>
-          <td>${bodAccount.roleTitle || 'Chủ Cửa Hàng BOD'}</td>
+          <td>${escHtmlOnline(bodAccount.roleTitle || 'Chủ Cửa Hàng BOD')}</td>
           <td><small style="color:#8b1f1f; font-weight:bold;">Toàn Quyền BOD</small></td>
           <td>${CURRENT_ROLE === 'BOD' ? '<button class="btn-action btn-edit" onclick="editBodInfo()">✏️ Sửa BOD</button>' : '🔒'}</td>
         </tr>
@@ -2582,16 +2582,16 @@ main { min-height: 0; }
         const perms = e.perms || {};
         html += `
           <tr>
-            <td><strong>${e.empCode || 'NV'}</strong></td>
-            <td><strong>${e.phone}</strong></td>
-            <td>${e.name}</td>
+            <td><strong>${escHtmlOnline(e.empCode || 'NV')}</strong></td>
+            <td><strong>${escHtmlOnline(e.phone)}</strong></td>
+            <td>${escHtmlOnline(e.name)}</td>
             <td>${e.uid ? '✅ Đã bảo mật' : '⏳ Chưa đăng nhập bản mới'}</td>
-            <td>${e.roleTitle || 'Nhân viên'}</td>
+            <td>${escHtmlOnline(e.roleTitle || 'Nhân viên')}</td>
             <td><small style="color:#2e7d32; font-weight:bold;">${permSummary(perms)}</small></td>
             <td>
               ${!empManageable(e) ? '<small style="color:#8b1f1f;">🔒 quản lý, chỉ BOD sửa</small>' : ''}
-              ${(empManageable(e) && can('empEdit')) ? `<button class="btn-action btn-edit" onclick="editEmpFull('${e.phone}')">✏️ Sửa</button>` : ''}
-              ${(empManageable(e) && can('empDelete')) ? `<button class="btn-action btn-del" onclick="deleteEmp('${e.phone}')">🗑️ Xóa</button>` : ''}
+              ${(empManageable(e) && can('empEdit')) ? `<button class="btn-action btn-edit" onclick="editEmpFull(decodeURIComponent('${encodeURIComponent(e.phone).replace(/'/g, '%27')}'))">✏️ Sửa</button>` : ''}
+              ${(empManageable(e) && can('empDelete')) ? `<button class="btn-action btn-del" onclick="deleteEmp(decodeURIComponent('${encodeURIComponent(e.phone).replace(/'/g, '%27')}'))">🗑️ Xóa</button>` : ''}
             </td>
           </tr>
         `;
@@ -2647,6 +2647,8 @@ main { min-height: 0; }
       const existing = empCache.find(e => e.phone === phone);
       if (!db) return;
       if (!phone || !name) return alert("Vui lòng điền SĐT và Tên!");
+  if (!/^[0-9+]{8,15}$/.test(phone)) return alert("SĐT chỉ gồm 8–15 chữ số (không dấu cách, dấu chấm).");
+  if (/[<>]/.test(name + empCode + roleTitle)) return alert("Tên / mã / chức danh không được chứa ký tự < >.");
       if (phone === bodAccount.phone && CURRENT_ROLE !== 'BOD') return alert('⚠️ Chỉ BOD được sửa tài khoản BOD.');
       if (existing) { if (!can('empEdit') || !empManageable(existing)) return alert('⚠️ Bạn không được sửa tài khoản này.'); }
       else if (!can('empCreate')) return alert('⚠️ Bạn chưa được cấp quyền tạo tài khoản nhân viên.');
@@ -2683,7 +2685,7 @@ main { min-height: 0; }
     async function cleanLegacyPasswords() {
       if (!confirm("Xóa mật khẩu cũ dạng chữ khỏi database? Chỉ xóa của người đã đăng nhập bản mới. Không hoàn lại được (chỉ có bản Export).")) return;
       const left = [];
-      for (const e of empCache) { if (e.pass === undefined) continue; if (e.uid) { await db.ref('staff/' + e.uid).set(true); await db.ref('employees/' + e.phone + '/pass').remove(); } else left.push(e.phone); }
+      for (const e of empCache) { if (e.pass === undefined) continue; if (e.uid) { await db.ref('staff/' + e.uid).set(staffLevel(normPerms(e.perms))); await db.ref('employees/' + e.phone + '/pass').remove(); } else left.push(e.phone); }
       await db.ref('bodAccount/pass').remove();
       alert(left.length ? "Đã xóa. Chưa xóa được của (chưa đăng nhập bản mới): " + left.join(', ') : "Đã xóa hết mật khẩu cũ!"); loadEmpData();
     }
@@ -2738,9 +2740,9 @@ main { min-height: 0; }
             const safeName = (i.name || '').replace(/'/g, "\\'");
             
             return `
-              <div class="item-card" onclick="addToCart('${itemIdStr}', '${safeName}', ${i.price}, '${itemType}')">
-                ${(liveMenuImages[i._k] || liveMenuImages[itemIdStr]) ? `<img alt="" src="${liveMenuImages[i._k] || liveMenuImages[itemIdStr]}" style="width:100%; height:64px; object-fit:cover; border-radius:6px; margin-bottom:4px;">` : ''}
-                <div class="item-name">${i.name}</div>
+              <div class="item-card" data-id="${escHtmlOnline(itemIdStr)}" data-name="${escHtmlOnline(i.name || '')}" data-type="${escHtmlOnline(itemType)}" onclick="addToCart(this.dataset.id, this.dataset.name, ${Number(i.price) || 0}, this.dataset.type)">
+                ${(liveMenuImages[i._k] || liveMenuImages[itemIdStr]) ? `<img alt="" src="${escHtmlOnline(safeImgPOS(liveMenuImages[i._k] || liveMenuImages[itemIdStr]))}" style="width:100%; height:64px; object-fit:cover; border-radius:6px; margin-bottom:4px;">` : ''}
+                <div class="item-name">${escHtmlOnline(i.name)}</div>
                 ${i.desc ? `<div style="font-size:10px; color:#8a7260; line-height:1.3; margin:2px 0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${String(i.desc).replace(/</g, '&lt;')}</div>` : ''}
                 <div class="item-price">${(i.price || 0).toLocaleString()}đ</div>
                 <div class="stock-tag">Tồn: ${stockQty}</div>
@@ -3006,7 +3008,7 @@ main { min-height: 0; }
         return `
           <div class="cart-item ${isGiftItem ? 'gift-item' : ''}">
             <div class="cart-row">
-              <strong>${item.name} ${(item.price === 0) ? '<span style="color:#2e7d32; font-weight:bold; font-size:11px;">🎁 (0đ - Quà Tặng)</span>' : ''}</strong>
+              <strong>${escHtmlOnline(item.name)} ${(item.price === 0) ? '<span style="color:#2e7d32; font-weight:bold; font-size:11px;">🎁 (0đ - Quà Tặng)</span>' : ''}</strong>
               <div>
                 <button class="qty-btn" onclick="changeQtyByIndex(${index}, -1)">-</button>
                 <span style="margin:0 5px;">${item.qty}</span>
@@ -3017,7 +3019,7 @@ main { min-height: 0; }
             ${priceHtml}
             <div class="note-chips">
               ${availableChips.map(chip => `
-                <span class="chip ${item.notes.includes(chip)?'selected':''}" onclick="toggleNoteByIndex(${index}, '${chip}')">${chip}</span>
+                <span class="chip ${item.notes.includes(chip)?'selected':''}" data-note="${escHtmlOnline(chip)}" onclick="toggleNoteByIndex(${index}, this.dataset.note)">${escHtmlOnline(chip)}</span>
               `).join('')}
             </div>
           </div>
@@ -3302,16 +3304,16 @@ function setHistoryFilterRange(rangeType) {
       let html = '<table class="data-table"><thead><tr><th>CN</th><th>Mã HD</th><th>STT</th><th>Thời Gian</th><th>Khách</th><th>SĐT</th><th>Thanh Toán</th><th>Món Bán</th><th>Tổng Tiền</th><th>Thao Tác</th></tr></thead><tbody>';
 
       list.forEach(o => {
-        const itemStr = (o.items || []).map(i => `${i.name} x${i.qty}`).join('<br>');
+        const itemStr = (o.items || []).map(i => `${escHtmlOnline(i.name)} x${escHtmlOnline(i.qty)}`).join('<br>');
         html += `
           <tr>
             <td><span class="branch-badge">${o.branchName || CURRENT_BRANCH}</span></td>
             <td><strong style="color:#8b1f1f;">${o.invoice_code || 'HD000000'}</strong>${o.editedAt ? '<br><a href="#" onclick="openOrderEditHistory(\'' + o.id + '\'); return false;" style="color:#e65100; font-weight:bold; font-size:10px; text-decoration:underline;" title="Bấm để xem lịch sử chỉnh sửa">✏️ sửa ' + (o.editCount || 1) + ' lần · ' + escHtmlOnline(o.editedBy || '') + '</a>' : ''}</td>
             <td><strong>#${o.order_number || 1}</strong></td>
             <td>${o.created_at || o.time || '---'}${o.createdBy ? '<br><small style="color:#888;">👤 ' + escHtmlOnline(o.createdBy) + '</small>' : ''}</td>
-            <td>${o.name || 'Khách Lẻ'}</td>
-            <td>${o.phone || '---'}</td>
-            <td><span style="font-weight:bold; color:#457b9d;">${o.payMethod || 'Tiền mặt'}</span></td>
+            <td>${escHtmlOnline(o.name || 'Khách Lẻ')}</td>
+            <td>${escHtmlOnline(o.phone || '---')}</td>
+            <td><span style="font-weight:bold; color:#457b9d;">${escHtmlOnline(o.payMethod || 'Tiền mặt')}</span></td>
             <td style="font-size:9px;">${itemStr}</td>
             <td><strong style="color:#2e7d32;">${(o.total || 0).toLocaleString()}đ</strong></td>
             <td>
@@ -3595,7 +3597,7 @@ function setHistoryFilterRange(rangeType) {
       if (!can('historyExport')) return alert('⚠️ Bạn chưa được cấp quyền xuất lịch sử.');
       if (historyCache.length === 0) return alert("Chưa có lịch sử để xuất!");
       let csv = `\uFEFFLỊCH SỬ GIAO DỊCH HÓA ĐƠN\nChi Nhánh,Mã Hóa Đơn,STT,Thời Gian,Khách Hàng,SĐT,Tổng Tiền,Hình Thức TT,Người Tạo,Số Lần Sửa,Người Sửa Cuối,Lần Sửa Cuối\n`;
-      historyCache.forEach(o => { csv += `"${o.branchName || CURRENT_BRANCH}","${o.invoice_code || ''}",#${o.order_number || 1},"${o.created_at || ''}","${o.name || 'Khách Lẻ'}","${o.phone || ''}",${o.total || 0},"${PAY_TYPE_NAME[orderPayType(o)]}","${o.createdBy || ''}",${o.editCount || 0},"${o.editedBy || ''}","${o.editedAt ? new Date(o.editedAt).toLocaleString('vi-VN') : ''}"\n`; });
+      historyCache.forEach(o => { csv += csvRow([o.branchName || CURRENT_BRANCH, o.invoice_code || '', '#' + (o.order_number || 1), o.created_at || '', o.name || 'Khách Lẻ', o.phone || '', Number(o.total) || 0, PAY_TYPE_NAME[orderPayType(o)], o.createdBy || '', Number(o.editCount) || 0, o.editedBy || '', o.editedAt ? new Date(o.editedAt).toLocaleString('vi-VN') : '']) + '\n'; });
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
@@ -3632,9 +3634,9 @@ function setHistoryFilterRange(rangeType) {
           html += `
             <tr>
               <td>${i.id}</td>
-              <td><strong>${i.name}</strong></td>
+              <td><strong>${escHtmlOnline(i.name)}</strong></td>
               <td><span style="font-weight:bold; color:${qty<10?'#8b1f1f':'#2e7d32'}">${qty}</span></td>
-              <td>${(can('stockEdit')) ? `<button class="btn-action btn-edit" onclick="updateStock('${itemIdStr}', '${i.name}', ${qty})">📦 Cập Nhật</button>` : ''}</td>
+              <td>${(can('stockEdit')) ? `<button class="btn-action btn-edit" data-id="${escHtmlOnline(itemIdStr)}" data-name="${escHtmlOnline(i.name)}" onclick="updateStock(this.dataset.id, this.dataset.name, ${Number(qty) || 0})">📦 Cập Nhật</button>` : ''}</td>
             </tr>
           `;
         });
@@ -4056,8 +4058,8 @@ function setHistoryFilterRange(rangeType) {
             <td><strong style="color:#2e7d32;">${c.points || 0} đ</strong></td>
             <td>${isVip ? '⭐ VIP' : 'Thường'}</td>
             <td style="white-space:nowrap;">
-              ${(can('custEdit')) ? `<button class="btn-action btn-edit" onclick="editCustomerByPhone(decodeURIComponent('${encodeURIComponent(c.phone)}'))">✏️ Sửa</button>` : ''}
-              ${(can('custDelete')) ? `<button class="btn-action btn-del" onclick="deleteCustomer(decodeURIComponent('${encodeURIComponent(c.phone)}'))">🗑️ Xóa</button>` : ''}
+              ${(can('custEdit')) ? `<button class="btn-action btn-edit" onclick="editCustomerByPhone(decodeURIComponent('${encodeURIComponent(c.phone).replace(/'/g, '%27')}'))">✏️ Sửa</button>` : ''}
+              ${(can('custDelete')) ? `<button class="btn-action btn-del" onclick="deleteCustomer(decodeURIComponent('${encodeURIComponent(c.phone).replace(/'/g, '%27')}'))">🗑️ Xóa</button>` : ''}
             </td>
           </tr>
         `;
@@ -4780,11 +4782,11 @@ function prepareBillHTML(orderData, branchNameOverride) {
         // Bổ sung hiển thị ghi chú ngay dưới tên món khi in bill
         let notesText = '';
         if (i.notes && i.notes.length > 0) {
-          notesText = `<br><span style="font-size:9px; font-style:italic; color:#000;">(${i.notes.join(', ')})</span>`;
+          notesText = `<br><span style="font-size:9px; font-style:italic; color:#000;">(${escHtmlOnline([].concat(i.notes).join(', '))})</span>`;
         }
         const promoText = ld > 0 ? `<br><span style="font-size:9px; color:#000;">KM ${escHtmlOnline(i.promoName || '')}: -${ld.toLocaleString()}</span>` : '';
 
-        itemsHtml += `<tr><td>${i.name}${notesText}${promoText}</td><td class="bill-center">${i.qty}</td><td class="bill-right">${(i.price || 0).toLocaleString()}</td><td class="bill-right">${((i.price || 0) * i.qty).toLocaleString()}</td></tr>`;
+        itemsHtml += `<tr><td>${escHtmlOnline(i.name)}${notesText}${promoText}</td><td class="bill-center">${i.qty}</td><td class="bill-right">${(i.price || 0).toLocaleString()}</td><td class="bill-right">${((i.price || 0) * i.qty).toLocaleString()}</td></tr>`;
       });
       document.getElementById('b-items-body').innerHTML = itemsHtml;
       document.getElementById('b-items-total').innerText = itemsOnlyTotal.toLocaleString();
@@ -4901,7 +4903,9 @@ function prepareBillHTML(orderData, branchNameOverride) {
     let onlineOrdersFirstLoad = true;
     let onlineModalTab = 'pending';
 
-    function escHtmlOnline(t) {
+    function cleanOnlineTxt(s, n) { return String(s == null ? '' : s).replace(/[<>]/g, '').slice(0, n || 200); }   // dữ liệu từ khách: bỏ < > rồi mới đưa vào POS
+function safeImgPOS(s) { s = String(s == null ? '' : s); return /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+\/=]+$/.test(s) ? s : ''; }   // chỉ nhận ảnh data:image
+function escHtmlOnline(t) {
       return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
@@ -5181,12 +5185,12 @@ function prepareBillHTML(orderData, branchNameOverride) {
       else if (SHOP_HOURS.enabled && !isShopOpenPOS()) { if (!confirm('⏰ Đang NGOÀI giờ mở cửa (' + hhmmP(SHOP_HOURS.openMin) + ' – ' + hhmmP(SHOP_HOURS.closeMin) + ').\nVẫn nhận đơn này?')) return; }
       if (!isOnlinePaid(order)) return alert('⚠️ Đơn này chưa xác nhận đã nhận tiền. Hãy kiểm tra ngân hàng rồi bấm "💰 Đã Nhận Tiền" trước.');
       cart = onlineItemsOf(order).map(i => ({
-        id: i.id || "1", name: i.name, price: resolveOnlineItemPrice(i),
-        type: i.type || 'food', qty: parseMoney(i.qty) || 1, notes: i.notes || []
+        id: cleanOnlineTxt(i.id || "1", 60), name: cleanOnlineTxt(i.name, 120), price: resolveOnlineItemPrice(i),
+        type: cleanOnlineTxt(i.type || 'food', 20), qty: Math.min(99, Math.max(1, parseMoney(i.qty) || 1)), notes: (Array.isArray(i.notes) ? i.notes : Object.values(i.notes || {})).map(n => cleanOnlineTxt(n, 60))
       }));
-      document.getElementById('cust-phone').value = order.phone || '';
-      document.getElementById('cust-name').value = order.name || '';
-      document.getElementById('cust-address').value = order.address || '';
+      document.getElementById('cust-phone').value = cleanOnlineTxt(order.phone || '', 20);
+      document.getElementById('cust-name').value = cleanOnlineTxt(order.name || '', 100);
+      document.getElementById('cust-address').value = cleanOnlineTxt(order.address || '', 300);
       document.getElementById('ship-fee').value = parseMoney(order.shipFee);
       setPayMethod('Chuyển khoản (Banking)');   // đơn online đã thu qua chuyển khoản
       { const ni = document.getElementById('order-note-input'); if (ni && order.orderType === 'preorder') ni.value = '[ĐẶT TRƯỚC - hẹn ' + (order.pickupLabel || '') + '] ' + (ni.value || ''); }
@@ -5214,12 +5218,12 @@ function prepareBillHTML(orderData, branchNameOverride) {
         div.style = 'display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #ddd; background:#fff; margin-bottom:4px; border-radius:4px;';
         div.innerHTML = `
           <div>
-            <strong>${item.name}</strong> - <span style="color:#e53935; font-weight:bold;">${Number(item.price).toLocaleString()}đ</span>${item.appPrice ? ` <span style="color:#e65100; font-weight:bold;">| Sàn: ${Number(item.appPrice).toLocaleString()}đ</span>` : ''}
-            <br><small style="color:#666;">[${item.category || 'Cuốn'}] | Ghi chú: ${(item.notes || []).join(', ') || 'Không'}</small>
+            <strong>${escHtmlOnline(item.name)}</strong> - <span style="color:#e53935; font-weight:bold;">${Number(item.price).toLocaleString()}đ</span>${item.appPrice ? ` <span style="color:#e65100; font-weight:bold;">| Sàn: ${Number(item.appPrice).toLocaleString()}đ</span>` : ''}
+            <br><small style="color:#666;">[${escHtmlOnline(item.category || 'Cuốn')}] | Ghi chú: ${escHtmlOnline([].concat(item.notes || []).join(', ') || 'Không')}</small>
           </div>
           <div>
-            <button onclick="fillEditMenuItem('${key}')" style="background:#f59e0b; color:white; border:none; padding:4px 8px; border-radius:4px; margin-right:4px; cursor:pointer; font-weight:bold;">Sửa</button>
-            <button onclick="deleteMenuItemFromFirebase('${key}')" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Xóa</button>
+            <button data-k="${escHtmlOnline(key)}" onclick="fillEditMenuItem(this.dataset.k)" style="background:#f59e0b; color:white; border:none; padding:4px 8px; border-radius:4px; margin-right:4px; cursor:pointer; font-weight:bold;">Sửa</button>
+            <button data-k="${escHtmlOnline(key)}" onclick="deleteMenuItemFromFirebase(this.dataset.k)" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Xóa</button>
           </div>
         `;
         if (!(can('menuEdit'))) div.querySelectorAll('button[onclick^="fillEditMenuItem"]').forEach(b => b.remove());
@@ -5367,7 +5371,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
       return k.some(x => perms && perms[x]) ? 'manager' : true;
     }
     // ===== GIỜ MỞ CỬA (BOD cài đặt) =====
-    let SHOP_HOURS = { enabled: true, openMin: 690, closeMin: 1290, preorder: true, maxDays: 2, leadMin: 30, slotMin: 15 }, _hoursListening = false;
+    let SHOP_HOURS = { enabled: true, openMin: 690, closeMin: 1290, preorder: true, leadMin: 30, slotMin: 15 }, _hoursListening = false;
     const hhmmP = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
     function isShopOpenPOS() { const t = new Date(Date.now() + 25200000), m = t.getUTCHours() * 60 + t.getUTCMinutes(); return m >= SHOP_HOURS.openMin && m < SHOP_HOURS.closeMin; }
     function updateHoursChip() {
@@ -5397,9 +5401,9 @@ function prepareBillHTML(orderData, branchNameOverride) {
         + '<label style="display:block;margin-bottom:6px;"><input type="checkbox" id="hr-on"' + (h.enabled ? ' checked' : '') + '> Bật giới hạn giờ nhận đơn (tắt = nhận đơn mọi lúc)</label>'
         + '<div style="display:flex;gap:8px;"><div style="flex:1;"><label style="' + lab + '">Mở cửa từ:</label><input id="hr-open" type="time" value="' + hhmmP(h.openMin) + '" style="' + shInp + '"></div><div style="flex:1;"><label style="' + lab + '">Đóng cửa lúc:</label><input id="hr-close" type="time" value="' + hhmmP(h.closeMin) + '" style="' + shInp + '"></div></div>'
         + '<label style="display:block;margin:4px 0 6px;"><input type="checkbox" id="hr-pre"' + (h.preorder ? ' checked' : '') + '> Cho khách ĐẶT TRƯỚC (hẹn giờ lấy/nhận)</label>'
-        + '<div style="display:flex;gap:8px;"><div style="flex:1;"><label style="' + lab + '">Đặt trước tối đa (ngày):</label><input id="hr-days" type="number" min="0" max="7" value="' + (h.maxDays || 0) + '" style="' + shInp + '"></div><div style="flex:1;"><label style="' + lab + '">Cách hiện tại tối thiểu (phút):</label><input id="hr-lead" type="number" min="0" max="240" value="' + (h.leadMin || 0) + '" style="' + shInp + '"></div></div>'
+        + '<label style="' + lab + '">Đặt trước phải cách hiện tại tối thiểu (phút):</label><input id="hr-lead" type="number" min="0" max="240" value="' + (h.leadMin || 0) + '" style="' + shInp + '">'
         + '<label style="' + lab + '">Mỗi khung giờ hẹn cách nhau:</label><select id="hr-slot" style="' + shInp + '"><option value="15">15 phút</option><option value="30">30 phút</option><option value="60">60 phút</option></select>'
-        + '<div style="font-size:11px;color:#777;margin-bottom:6px;">Đặt ngay chỉ nhận trong giờ mở cửa. Đặt trước chọn giờ hẹn trong khung mở cửa. Áp dụng cả app khách và POS.</div>'
+        + '<div style="font-size:11px;color:#777;margin-bottom:6px;">Đặt ngay chỉ nhận trong giờ mở cửa. Đặt trước CHỈ trong ngày hôm nay, giờ hẹn nằm trong khung mở cửa (không đặt trước qua ngày). Lưu xong áp dụng ngay cho app khách và POS.</div>'
         + '<div id="sh-msg" style="color:#c1121f;font-weight:bold;margin-bottom:6px;"></div>'
         + '<button style="' + shBtn + 'background:#2a9d8f;" onclick="saveHours()">💾 LƯU</button><button style="' + shBtn + 'background:#6c757d;" onclick="closeShiftModal()">Đóng</button>');
       document.getElementById('hr-slot').value = String(h.slotMin || 15);
@@ -5411,7 +5415,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
       if (op == null || cl == null) return shMsg('Chọn giờ mở và đóng cửa.');
       if (cl <= op) return shMsg('Giờ đóng cửa phải sau giờ mở cửa.');
       const data = { enabled: document.getElementById('hr-on').checked, openMin: op, closeMin: cl, open: hhmmP(op), close: hhmmP(cl), preorder: document.getElementById('hr-pre').checked,
-        maxDays: Math.max(0, Math.min(7, +document.getElementById('hr-days').value || 0)), leadMin: Math.max(0, Math.min(240, +document.getElementById('hr-lead').value || 0)), slotMin: +document.getElementById('hr-slot').value || 15, updatedAt: Date.now(), updatedBy: CURRENT_USER_NAME || 'BOD' };
+        leadMin: Math.max(0, Math.min(240, +document.getElementById('hr-lead').value || 0)), slotMin: +document.getElementById('hr-slot').value || 15, updatedAt: Date.now(), updatedBy: CURRENT_USER_NAME || 'BOD' };
       try { await db.ref('shopHours').set(data); auditEvent('đổi giờ mở cửa', [data.open + ' - ' + data.close]); alert('✔ Đã lưu giờ mở cửa. Áp dụng ngay cho khách và POS.'); closeShiftModal(); }
       catch (e) { shMsg('Không lưu được: ' + (e && e.message ? e.message : e)); }
     }
