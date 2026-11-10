@@ -315,6 +315,7 @@ main { min-height: 0; }
       <button class="btn-header" id="btn-menu-notice" onclick="openNoticeModal()" style="display:none; background:#e07a00;">📢 Thông Báo Khách</button>
       <button class="btn-header" id="btn-menu-emp" style="display:none;" onclick="openEmpModal()">👤 Nhân Viên</button>
       <button class="btn-header role-bod-only" id="btn-menu-shop" onclick="openShopConfigModal()">🏪 Cấu Hình</button>
+      <button class="btn-header" id="hours-chip" onclick="openHoursModal()">🕒 Giờ mở cửa</button>
       <button class="btn-header role-bod-only" onclick="openRestoreDialog()">♻️ Khôi phục</button>
       <button class="btn-header" id="btn-menu-promo" style="display:none;" onclick="openPromoModal()">🎁 Khuyến Mãi</button>
       <button class="btn-header" id="btn-print-mode" onclick="togglePrintMode()" title="Chọn cách in: Bluetooth hoặc máy in nối dây USB">🔌 Kiểu in: Bluetooth</button>
@@ -557,7 +558,7 @@ main { min-height: 0; }
 
   <!-- MODAL ĐƠN KHÁCH ORDER ONLINE -->
   <div class="modal-overlay" id="online-modal">
-    <div class="modal-content" style="max-width: 1050px;">
+    <div class="modal-content" style="max-width: 1250px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:2px solid #8b1f1f; padding-bottom:4px;">
         <h3 style="color:#8b1f1f; font-size:14px; margin:0;">📲 Đơn Hàng Trực Tuyến Từ Khách (<span id="online-branch-title">CN1</span>)</h3>
         <button class="btn-action btn-del" style="padding:2px 6px; font-size:12px;" onclick="closeOnlineOrdersModal()">✕ Đóng</button>
@@ -1916,7 +1917,7 @@ main { min-height: 0; }
       const off = auth.onAuthStateChanged(u => {
         off();
         if (!u) { localStorage.removeItem("cuon_session"); return openLoginModal(); }
-        fetchBodAccount(); fetchShopConfig(); loadBranchStock();
+        fetchBodAccount(); fetchShopConfig(); listenShopHours(); loadBranchStock();
         restoreSession(); setTimeout(shiftAfterLogin, 800); btStartKeepAlive();
       });
     }
@@ -2299,7 +2300,7 @@ main { min-height: 0; }
       applyRolePermissions(); closeLoginModal(); watchMyPerms();
       fetchBodAccount(); fetchBranchesList(() => { startListeningForOnlineOrders(); });
       alert(`Đăng nhập thành công [${CURRENT_BRANCH}] - ${CURRENT_ROLE === 'BOD' ? 'quyền BOD' : CURRENT_USER_NAME}!`);
-      fetchShopConfig(); loadBranchStock(); shiftAfterLogin(); btStartKeepAlive();
+      fetchShopConfig(); listenShopHours(); loadBranchStock(); shiftAfterLogin(); btStartKeepAlive();
     }
 
     function applyRolePermissions() {
@@ -5004,7 +5005,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
       onlineOrdersRef.on('value', snapshot => {
         onlineOrdersCache = [];
         cancelledOnlineOrdersCache = [];
-        let hasNewOrder = false;
+        let hasNewOrder = false, newPreOrder = null;
         if (snapshot.exists()) {
           snapshot.forEach(child => {
             const data = child.val() || {};
@@ -5012,7 +5013,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
               onlineOrdersCache.push({ ...data, id: String(child.key).replace(/[^\w-]/g, '') });
               if (!knownOnlineOrderIds.has(child.key)) {
                 knownOnlineOrderIds.add(child.key);
-                hasNewOrder = true;
+                hasNewOrder = true; if (data.orderType === 'preorder') newPreOrder = data;
               }
             } else if (data.status === 'Đã hủy') {
               cancelledOnlineOrdersCache.push({ ...data, id: String(child.key).replace(/[^\w-]/g, '') });
@@ -5020,12 +5021,13 @@ function prepareBillHTML(orderData, branchNameOverride) {
           });
         }
         cancelledOnlineOrdersCache.sort((x, y) => (y.cancelledAt || 0) - (x.cancelledAt || 0));
-        document.getElementById('online-count-badge').innerText = onlineOrdersCache.length;
+        { const np = onlineOrdersCache.filter(x => x.orderType === 'preorder').length; document.getElementById('online-count-badge').innerText = onlineOrdersCache.length + (np ? ' (📅' + np + ')' : ''); }
         document.getElementById('online-tab-pending-count').innerText = onlineOrdersCache.length;
         document.getElementById('online-tab-cancelled-count').innerText = cancelledOnlineOrdersCache.length;
 
         // Có đơn khách đặt MỚI (không tính các đơn có sẵn lúc vừa mở trang) -> phát nhạc báo
         if (hasNewOrder && !onlineOrdersFirstLoad) playNotificationSound(ONLINE_ALERT_REPEAT);
+        if (newPreOrder && !onlineOrdersFirstLoad) posToast('📅 ĐƠN ĐẶT TRƯỚC mới: ' + (newPreOrder.name || 'Khách') + ' · hẹn ' + (newPreOrder.pickupLabel || ''));
         onlineOrdersFirstLoad = false;
 
         // Đang mở bảng đơn thì cập nhật luôn
@@ -5071,12 +5073,34 @@ function prepareBillHTML(orderData, branchNameOverride) {
       }
 
       if (onlineOrdersCache.length === 0) { container.innerHTML = '<p style="padding:15px; text-align:center;">Chưa có đơn online nào.</p>'; return; }
-      let html = '<table class="data-table"><thead><tr><th>Thời Gian</th><th>Khách</th><th>SĐT</th><th>Địa Chỉ</th><th>Tổng Tiền</th><th>Món</th><th>Thao Tác</th></tr></thead><tbody>';
-      onlineOrdersCache.forEach(o => {
-        html += `<tr><td>${escHtmlOnline(o.time)}</td><td>${escHtmlOnline(o.name)}</td><td><strong>${escHtmlOnline(o.phone)}</strong></td><td>${escHtmlOnline(o.address)}</td><td>${onlineTotalHtml(o)}${onlineCheckHtml(o)}${onlinePayHtml(o)}</td><td>${onlineItemsHtml(o)}</td><td style="white-space:nowrap;">${isOnlinePaid(o) ? `<button class="btn-action btn-edit" onclick="acceptOnlineOrder('${o.id}')">✅ Nhận Đơn</button>` : `<button class="btn-action btn-edit" style="background:#e65100;" onclick="confirmOnlinePayment('${o.id}')">💰 Đã Nhận Tiền</button>`}<button class="btn-action btn-del" onclick="openCancelOnlineModal('${o.id}')">❌ Hủy Đơn</button></td></tr>`;
-      });
-      html += '</tbody></table>';
-      container.innerHTML = html;
+      const isPre = o => o.orderType === 'preorder' && parseMoney(o.pickupAt) > 0;
+      const normal = onlineOrdersCache.filter(o => !isPre(o)).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      const pre = onlineOrdersCache.filter(isPre).sort((a, b) => parseMoney(a.pickupAt) - parseMoney(b.pickupAt));
+      const col = (title, list, color) => '<div style="flex:1;min-width:330px;"><div style="font-weight:bold;color:' + color + ';border-bottom:3px solid ' + color + ';margin-bottom:6px;padding-bottom:3px;">' + title + ' (' + list.length + ')</div>'
+        + (list.length ? list.map(onlineCardHtml).join('') : '<div style="color:#999;padding:10px;text-align:center;">Không có đơn</div>') + '</div>';
+      container.innerHTML = '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;">' + col('⚡ ĐƠN THƯỜNG (đặt ngay)', normal, '#2a9d8f') + col('📅 ĐƠN ĐẶT TRƯỚC (theo giờ hẹn)', pre, '#6a4c93') + '</div>';
+    }
+    const DELIVERY_LBL = { pickup: '🚶 Đến lấy tại quán', customer_ship: '🛵 Khách book ship', shop_ship: '🛵 Quán ship' };
+    function onlineCardHtml(o) {
+      const e = escHtmlOnline, pre = o.orderType === 'preorder' && parseMoney(o.pickupAt) > 0;
+      let head;
+      if (pre) {
+        const diff = Math.round((parseMoney(o.pickupAt) - Date.now()) / 60000);
+        const left = diff >= 0 ? (diff >= 60 ? 'còn ' + Math.floor(diff / 60) + 'h' + (diff % 60) + 'p' : 'còn ' + diff + ' phút') : 'QUÁ HẸN ' + (-diff) + ' phút';
+        head = '<div style="background:' + (diff < 0 ? '#c1121f' : diff <= 30 ? '#e65100' : '#6a4c93') + ';color:#fff;padding:6px 8px;font-weight:bold;border-radius:6px 6px 0 0;">📅 ĐẶT TRƯỚC · GIỜ HẸN: ' + e(o.pickupLabel || '') + ' (' + left + ')</div>';
+      } else head = '<div style="background:#2a9d8f;color:#fff;padding:6px 8px;font-weight:bold;border-radius:6px 6px 0 0;">⚡ ĐẶT NGAY · ' + e(o.time) + '</div>';
+      const btn = isOnlinePaid(o)
+        ? '<button class="btn-action btn-edit" onclick="acceptOnlineOrder(\'' + o.id + '\')">✅ Nhận Đơn</button>'
+        : '<button class="btn-action btn-edit" style="background:#e65100;" onclick="confirmOnlinePayment(\'' + o.id + '\')">💰 Đã Nhận Tiền</button>';
+      return '<div style="border:1px solid #d9c9b6;border-radius:8px;margin-bottom:8px;background:#fff;">' + head
+        + '<div style="padding:8px;font-size:12px;line-height:1.5;">'
+        + '<div><b>' + e(o.name) + '</b> · <strong>' + e(o.phone) + '</strong></div>'
+        + '<div>' + (DELIVERY_LBL[o.deliveryType] || '') + (o.address ? ' · ' + e(o.address) : '') + '</div>'
+        + (o.note ? '<div style="color:#8b1f1f;">📝 ' + e(o.note) + '</div>' : '')
+        + '<div style="margin:4px 0;">' + onlineItemsHtml(o) + '</div>'
+        + '<div>' + onlineTotalHtml(o) + onlineCheckHtml(o) + onlinePayHtml(o) + '</div>'
+        + '<div style="margin-top:6px;white-space:nowrap;">' + btn + '<button class="btn-action btn-del" onclick="openCancelOnlineModal(\'' + o.id + '\')">❌ Hủy Đơn</button></div>'
+        + '</div></div>';
     }
 
     // ----- Hủy đơn khách đặt (bắt buộc ghi lý do) -----
@@ -5153,6 +5177,8 @@ function prepareBillHTML(orderData, branchNameOverride) {
       if (!can('online')) return alert('⚠️ Bạn chưa được cấp quyền xử lý đơn online.');
       const order = onlineOrdersCache.find(o => o.id === orderId);
       if (!order) return;
+      if (order.orderType === 'preorder') { if (!confirm('📅 ĐƠN ĐẶT TRƯỚC — giờ hẹn: ' + (order.pickupLabel || '') + '\nNạp đơn vào giỏ ngay bây giờ?')) return; }
+      else if (SHOP_HOURS.enabled && !isShopOpenPOS()) { if (!confirm('⏰ Đang NGOÀI giờ mở cửa (' + hhmmP(SHOP_HOURS.openMin) + ' – ' + hhmmP(SHOP_HOURS.closeMin) + ').\nVẫn nhận đơn này?')) return; }
       if (!isOnlinePaid(order)) return alert('⚠️ Đơn này chưa xác nhận đã nhận tiền. Hãy kiểm tra ngân hàng rồi bấm "💰 Đã Nhận Tiền" trước.');
       cart = onlineItemsOf(order).map(i => ({
         id: i.id || "1", name: i.name, price: resolveOnlineItemPrice(i),
@@ -5163,6 +5189,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
       document.getElementById('cust-address').value = order.address || '';
       document.getElementById('ship-fee').value = parseMoney(order.shipFee);
       setPayMethod('Chuyển khoản (Banking)');   // đơn online đã thu qua chuyển khoản
+      { const ni = document.getElementById('order-note-input'); if (ni && order.orderType === 'preorder') ni.value = '[ĐẶT TRƯỚC - hẹn ' + (order.pickupLabel || '') + '] ' + (ni.value || ''); }
       renderCart();
       if (db) db.ref('branches/' + CURRENT_BRANCH + '/online_orders/' + orderId).update({ status: 'Đang xử lý' });
       closeOnlineOrdersModal();
@@ -5339,6 +5366,56 @@ function prepareBillHTML(orderData, branchNameOverride) {
       const k = ['menuAdd', 'menuEdit', 'menuDelete', 'promoManage', 'empView', 'empCreate', 'empEdit', 'empDelete'];
       return k.some(x => perms && perms[x]) ? 'manager' : true;
     }
+    // ===== GIỜ MỞ CỬA (BOD cài đặt) =====
+    let SHOP_HOURS = { enabled: true, openMin: 690, closeMin: 1290, preorder: true, maxDays: 2, leadMin: 30, slotMin: 15 }, _hoursListening = false;
+    const hhmmP = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    function isShopOpenPOS() { const t = new Date(Date.now() + 25200000), m = t.getUTCHours() * 60 + t.getUTCMinutes(); return m >= SHOP_HOURS.openMin && m < SHOP_HOURS.closeMin; }
+    function updateHoursChip() {
+      const c = document.getElementById('hours-chip'); if (!c) return;
+      c.innerText = SHOP_HOURS.enabled ? '🕒 ' + hhmmP(SHOP_HOURS.openMin) + '–' + hhmmP(SHOP_HOURS.closeMin) + (isShopOpenPOS() ? ' · 🟢 Đang mở' : ' · 🔴 Ngoài giờ') : '🕒 Giờ mở cửa: TẮT';
+    }
+    function listenShopHours() {
+      if (!db || _hoursListening) return; _hoursListening = true;
+      db.ref('shopHours').on('value', async s => {
+        const v = s.val();
+        if (v) SHOP_HOURS = { ...SHOP_HOURS, ...v };
+        else if (CURRENT_ROLE === 'BOD') { try { await db.ref('shopHours').set({ ...SHOP_HOURS, open: '11:30', close: '21:30', updatedAt: Date.now(), updatedBy: 'mặc định' }); } catch (e) {} }
+        updateHoursChip();
+      }, () => {});
+      setInterval(updateHoursChip, 30000);
+      setInterval(() => { const m = document.getElementById('online-modal'); if (m && m.style.display === 'flex' && onlineModalTab === 'pending') renderOnlineOrdersTable(); }, 60000);   // cập nhật đếm ngược giờ hẹn
+    }
+    function posToast(msg) {
+      const t = document.createElement('div'); t.innerText = msg;
+      t.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#6a4c93;color:#fff;padding:12px 18px;border-radius:10px;font-weight:bold;z-index:999999;box-shadow:0 4px 14px rgba(0,0,0,.4);max-width:90vw;';
+      document.body.appendChild(t); setTimeout(() => t.remove(), 9000);
+    }
+    function openHoursModal() {
+      const h = SHOP_HOURS, lab = 'font-size:12px;font-weight:bold;';
+      if (CURRENT_ROLE !== 'BOD') return alert('🕒 Giờ mở cửa: ' + (h.enabled ? hhmmP(h.openMin) + ' – ' + hhmmP(h.closeMin) : 'không giới hạn') + '\nChỉ BOD được thay đổi.');
+      shiftModal('<h3 style="margin:0 0 6px;color:#8b1f1f;">🕒 Giờ mở cửa & đặt trước</h3>'
+        + '<label style="display:block;margin-bottom:6px;"><input type="checkbox" id="hr-on"' + (h.enabled ? ' checked' : '') + '> Bật giới hạn giờ nhận đơn (tắt = nhận đơn mọi lúc)</label>'
+        + '<div style="display:flex;gap:8px;"><div style="flex:1;"><label style="' + lab + '">Mở cửa từ:</label><input id="hr-open" type="time" value="' + hhmmP(h.openMin) + '" style="' + shInp + '"></div><div style="flex:1;"><label style="' + lab + '">Đóng cửa lúc:</label><input id="hr-close" type="time" value="' + hhmmP(h.closeMin) + '" style="' + shInp + '"></div></div>'
+        + '<label style="display:block;margin:4px 0 6px;"><input type="checkbox" id="hr-pre"' + (h.preorder ? ' checked' : '') + '> Cho khách ĐẶT TRƯỚC (hẹn giờ lấy/nhận)</label>'
+        + '<div style="display:flex;gap:8px;"><div style="flex:1;"><label style="' + lab + '">Đặt trước tối đa (ngày):</label><input id="hr-days" type="number" min="0" max="7" value="' + (h.maxDays || 0) + '" style="' + shInp + '"></div><div style="flex:1;"><label style="' + lab + '">Cách hiện tại tối thiểu (phút):</label><input id="hr-lead" type="number" min="0" max="240" value="' + (h.leadMin || 0) + '" style="' + shInp + '"></div></div>'
+        + '<label style="' + lab + '">Mỗi khung giờ hẹn cách nhau:</label><select id="hr-slot" style="' + shInp + '"><option value="15">15 phút</option><option value="30">30 phút</option><option value="60">60 phút</option></select>'
+        + '<div style="font-size:11px;color:#777;margin-bottom:6px;">Đặt ngay chỉ nhận trong giờ mở cửa. Đặt trước chọn giờ hẹn trong khung mở cửa. Áp dụng cả app khách và POS.</div>'
+        + '<div id="sh-msg" style="color:#c1121f;font-weight:bold;margin-bottom:6px;"></div>'
+        + '<button style="' + shBtn + 'background:#2a9d8f;" onclick="saveHours()">💾 LƯU</button><button style="' + shBtn + 'background:#6c757d;" onclick="closeShiftModal()">Đóng</button>');
+      document.getElementById('hr-slot').value = String(h.slotMin || 15);
+    }
+    async function saveHours() {
+      if (CURRENT_ROLE !== 'BOD') return;
+      const tm = id => { const v = document.getElementById(id).value; if (!/^\d\d:\d\d$/.test(v)) return null; return (+v.slice(0, 2)) * 60 + (+v.slice(3)); };
+      const op = tm('hr-open'), cl = tm('hr-close');
+      if (op == null || cl == null) return shMsg('Chọn giờ mở và đóng cửa.');
+      if (cl <= op) return shMsg('Giờ đóng cửa phải sau giờ mở cửa.');
+      const data = { enabled: document.getElementById('hr-on').checked, openMin: op, closeMin: cl, open: hhmmP(op), close: hhmmP(cl), preorder: document.getElementById('hr-pre').checked,
+        maxDays: Math.max(0, Math.min(7, +document.getElementById('hr-days').value || 0)), leadMin: Math.max(0, Math.min(240, +document.getElementById('hr-lead').value || 0)), slotMin: +document.getElementById('hr-slot').value || 15, updatedAt: Date.now(), updatedBy: CURRENT_USER_NAME || 'BOD' };
+      try { await db.ref('shopHours').set(data); auditEvent('đổi giờ mở cửa', [data.open + ' - ' + data.close]); alert('✔ Đã lưu giờ mở cửa. Áp dụng ngay cho khách và POS.'); closeShiftModal(); }
+      catch (e) { shMsg('Không lưu được: ' + (e && e.message ? e.message : e)); }
+    }
+
     // ===== KHÔI PHỤC DỮ LIỆU TỪ FILE JSON (chỉ BOD) =====
     function openRestoreDialog() {
       if (CURRENT_ROLE !== 'BOD') return alert('Chỉ BOD được khôi phục dữ liệu!');
@@ -5368,7 +5445,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
     renderPermGroups(); applyPreset('cashier');
     applyRolePermissions();
     checkAutoLogin();
-    fetchShopConfig();
+    fetchShopConfig(); listenShopHours();
     loadBranchStock();
     setTimeout(() => { reconnectPrinterSilently(); }, 1500);
     
