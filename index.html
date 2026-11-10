@@ -1920,6 +1920,14 @@ main { min-height: 0; }
         restoreSession(); setTimeout(shiftAfterLogin, 800); btStartKeepAlive();
       });
     }
+  // Kiểm tra vai trò BOD thật trên Firebase (chống sửa localStorage để hiện giao diện BOD)
+  async function verifyBodRole() {
+      if (CURRENT_ROLE !== 'BOD' || !auth || !auth.currentUser) return;
+      try {
+        const ok = (await db.ref('admins/' + auth.currentUser.uid).once('value')).exists();
+        if (!ok) { localStorage.removeItem('cuon_session'); try { auth.signOut(); } catch (e) {} location.reload(); }
+      } catch (e) { /* mạng lỗi: bỏ qua, Rules vẫn chặn ghi trái phép */ }
+  }
   function restoreSession() {
       const savedSession = localStorage.getItem("cuon_session");
       if (!savedSession) {
@@ -1947,6 +1955,7 @@ main { min-height: 0; }
           if (CURRENT_ROLE === 'BOD') {
             CURRENT_PERMISSIONS = fullPerms();
           }
+          verifyBodRole();   // không tin vai trò lưu trong máy: kiểm tra lại với Firebase
 
           document.getElementById('header-branch-tag').innerText = `📍 ${CURRENT_BRANCH}`;
           applyRolePermissions();
@@ -4919,8 +4928,10 @@ function prepareBillHTML(orderData, branchNameOverride) {
     }
     function resolveOnlineItemPrice(i) {
       const raw = i.price != null ? i.price : (i.unitPrice != null ? i.unitPrice : i.price_each);
+      const mp = findMenuPrice(i);   // ưu tiên giá menu thật, không tin giá khách gửi lên
+      if (mp > 0) return mp;
       const p = parseMoney(raw);
-      return p > 0 ? p : findMenuPrice(i);
+      return p > 0 ? p : 0;
     }
     // Tổng tiền: lấy trường tổng của đơn; nếu thiếu/0 thì tự tính từ các món + phí ship
     function resolveOnlineTotal(o) {
@@ -4930,6 +4941,24 @@ function prepareBillHTML(orderData, branchNameOverride) {
       const items = onlineItemsOf(o);
       const sum = items.reduce((acc, i) => acc + resolveOnlineItemPrice(i) * (parseMoney(i.qty) || 1), 0) + parseMoney(o.shipFee);
       return { value: sum, estimated: sum > 0 };
+    }
+    // Đối chiếu đơn khách với giá menu hiện tại để phát hiện đơn bị sửa giá
+    function onlineCheckHtml(o) {
+      const items = onlineItemsOf(o); if (!items.length) return '';
+      let menuGross = 0, claimedGross = 0; const bad = [];
+      items.forEach(i => {
+        const q = parseMoney(i.qty) || 1, mp = findMenuPrice(i), cp = parseMoney(i.price);
+        claimedGross += cp * q;
+        if (mp > 0) { menuGross += mp * q; if (cp !== mp) bad.push(escHtmlOnline(i.name) + ' (khách ghi ' + cp.toLocaleString() + 'đ, menu ' + mp.toLocaleString() + 'đ)'); }
+        else menuGross += cp * q;
+      });
+      const stated = parseMoney(o.total), disc = parseMoney(o.lineDiscountTotal) + parseMoney(o.billDiscount);
+      const mismatch = Math.abs(stated - (claimedGross - disc)) > 1;
+      let h = '';
+      if (bad.length || mismatch) h += '<div style="margin-top:4px;padding:4px;border:2px solid #c1121f;background:#fff0f0;color:#c1121f;font-size:11px;font-weight:bold;">⚠️ KIỂM TRA TRƯỚC KHI NHẬN: '
+        + (bad.length ? 'giá món khác menu: ' + bad.join('; ') + '. ' : '') + (mismatch ? 'Tổng tiền không khớp các món.' : '') + '</div>';
+      if (stated < menuGross) h += '<div style="font-size:11px;color:#6a4c93;margin-top:2px;">Giá menu: ' + menuGross.toLocaleString() + 'đ · khách khai ' + stated.toLocaleString() + 'đ (giảm ' + (menuGross - stated).toLocaleString() + 'đ). Đối chiếu khuyến mãi + tiền ngân hàng.</div>';
+      return h;
     }
     function onlineTotalHtml(o) {
       const t = resolveOnlineTotal(o);
@@ -4980,13 +5009,13 @@ function prepareBillHTML(orderData, branchNameOverride) {
           snapshot.forEach(child => {
             const data = child.val() || {};
             if (!data.status || data.status === 'Chờ xử lý') {
-              onlineOrdersCache.push({ id: child.key, ...data });
+              onlineOrdersCache.push({ ...data, id: String(child.key).replace(/[^\w-]/g, '') });
               if (!knownOnlineOrderIds.has(child.key)) {
                 knownOnlineOrderIds.add(child.key);
                 hasNewOrder = true;
               }
             } else if (data.status === 'Đã hủy') {
-              cancelledOnlineOrdersCache.push({ id: child.key, ...data });
+              cancelledOnlineOrdersCache.push({ ...data, id: String(child.key).replace(/[^\w-]/g, '') });
             }
           });
         }
@@ -5044,7 +5073,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
       if (onlineOrdersCache.length === 0) { container.innerHTML = '<p style="padding:15px; text-align:center;">Chưa có đơn online nào.</p>'; return; }
       let html = '<table class="data-table"><thead><tr><th>Thời Gian</th><th>Khách</th><th>SĐT</th><th>Địa Chỉ</th><th>Tổng Tiền</th><th>Món</th><th>Thao Tác</th></tr></thead><tbody>';
       onlineOrdersCache.forEach(o => {
-        html += `<tr><td>${escHtmlOnline(o.time)}</td><td>${escHtmlOnline(o.name)}</td><td><strong>${escHtmlOnline(o.phone)}</strong></td><td>${escHtmlOnline(o.address)}</td><td>${onlineTotalHtml(o)}${onlinePayHtml(o)}</td><td>${onlineItemsHtml(o)}</td><td style="white-space:nowrap;">${isOnlinePaid(o) ? `<button class="btn-action btn-edit" onclick="acceptOnlineOrder('${o.id}')">✅ Nhận Đơn</button>` : `<button class="btn-action btn-edit" style="background:#e65100;" onclick="confirmOnlinePayment('${o.id}')">💰 Đã Nhận Tiền</button>`}<button class="btn-action btn-del" onclick="openCancelOnlineModal('${o.id}')">❌ Hủy Đơn</button></td></tr>`;
+        html += `<tr><td>${escHtmlOnline(o.time)}</td><td>${escHtmlOnline(o.name)}</td><td><strong>${escHtmlOnline(o.phone)}</strong></td><td>${escHtmlOnline(o.address)}</td><td>${onlineTotalHtml(o)}${onlineCheckHtml(o)}${onlinePayHtml(o)}</td><td>${onlineItemsHtml(o)}</td><td style="white-space:nowrap;">${isOnlinePaid(o) ? `<button class="btn-action btn-edit" onclick="acceptOnlineOrder('${o.id}')">✅ Nhận Đơn</button>` : `<button class="btn-action btn-edit" style="background:#e65100;" onclick="confirmOnlinePayment('${o.id}')">💰 Đã Nhận Tiền</button>`}<button class="btn-action btn-del" onclick="openCancelOnlineModal('${o.id}')">❌ Hủy Đơn</button></td></tr>`;
       });
       html += '</tbody></table>';
       container.innerHTML = html;
@@ -5203,7 +5232,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
       const f = inp.files && inp.files[0];
       if (!f) return;
       try {
-        pendingMenuImage = await compressImageToDataURL(f, 480, 0.7);
+        pendingMenuImage = await compressImageToDataURL(f, 400, 0.62);
         const pv = document.getElementById('menu-item-image-preview');
         pv.src = pendingMenuImage; pv.style.display = 'block';
       } catch (e) { alert('Không đọc được ảnh này, thử ảnh khác nhé!'); inp.value = ''; }
