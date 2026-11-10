@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#8b1f1f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Cuốn+ POS">
   <title>CUỐN+ POS - Quản Lý Đa Chi Nhánh & Tự Động In Bill</title>
 
   <!-- 👇 DÁN ĐOẠN NÀY VÀO ĐÂY 👇 -->
@@ -1796,17 +1801,32 @@ main { min-height: 0; }
       hours: ['info', 'Thay đổi giờ mở cửa', 'Từ hôm nay quán mở cửa từ ... đến ...\nCảm ơn khách iu!'],
       promo: ['promo', 'Khuyến mãi hôm nay', 'Hôm nay quán có chương trình: ...']
     };
-    let _ntData = {};
-    async function openNoticeModal() {
+    let _ntData = {}, _ntLog = {}, _ntEditId = null;
+    const ntEsc = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const ntTime = n => n ? new Date(+n).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    const ntTypeLbl = { closed: '🔴 Nghỉ', info: '📢 Thường', promo: '🎁 KM' };
+    async function openNoticeModal(keepEdit) {
       if (!can('noticeManage')) return alert('⚠️ Bạn chưa được cấp quyền đăng thông báo cho khách.');
       if (!db) return alert('Chưa kết nối Firebase!');
+      if (!keepEdit) _ntEditId = null;
       try { _ntData = (await db.ref('shopNotice').once('value')).val() || {}; } catch (e) { _ntData = {}; }
+      try { _ntLog = (await db.ref('shopNoticeLog').orderByKey().limitToLast(30).once('value')).val() || {}; } catch (e) { _ntLog = {}; }
       const keys = ['ALL'].concat(branchList), st = k => { const n = _ntData[k]; return n && n.enabled ? '✅' : '⏸'; };
       const opt = (v, t) => '<option value="' + v + '">' + t + '</option>';
       const lab = 'font-size:12px;font-weight:bold;';
+      const live = id => Object.keys(_ntData).some(k => _ntData[k] && _ntData[k].enabled && _ntData[k].logId === id);
+      const hist = Object.keys(_ntLog).sort().reverse().map(id => {
+        const r = _ntLog[id] || {}, on = live(id);
+        return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;margin-bottom:6px;' + (_ntEditId === id ? 'background:#fff7e0;' : '') + '">'
+          + '<div style="display:flex;justify-content:space-between;gap:6px;font-size:11px;color:#555;"><span>' + (on ? '<b style="color:#2a9d8f;">✅ ĐANG HIỆN</b>' : '⏸ Đã tắt') + ' · ' + ntTime(id) + '</span><span>' + (r.scope === 'ALL' ? 'Tất cả' : ntEsc(r.scope)) + ' · ' + (ntTypeLbl[r.type] || '') + '</span></div>'
+          + '<div style="font-weight:bold;margin:3px 0;">' + ntEsc(r.title || (r.message || '').slice(0, 50)) + '</div>'
+          + '<div style="display:flex;gap:6px;"><button type="button" style="flex:1;padding:6px;border:0;border-radius:6px;background:#457b9d;color:#fff;font-weight:bold;" onclick="viewNotice(\'' + id + '\')">👁 Xem</button>'
+          + '<button type="button" style="flex:1;padding:6px;border:0;border-radius:6px;background:#e07a00;color:#fff;font-weight:bold;" onclick="editNotice(\'' + id + '\')">✏️ Sửa</button></div></div>';
+      }).join('') || '<div style="color:#888;font-size:12px;">Chưa có thông báo nào được đăng.</div>';
       shiftModal('<h3 style="margin:0 0 6px;color:#8b1f1f;">📢 Thông báo cho khách (hiện pop-up trên app đặt món)</h3>'
         + '<div style="font-size:12px;color:#555;margin-bottom:6px;">Đang có: ' + keys.map(k => st(k) + ' ' + (k === 'ALL' ? 'Tất cả' : k)).join(' · ') + '</div>'
-        + '<label style="' + lab + '">Áp dụng cho:</label><select id="nt-scope" onchange="fillNoticeForm()" style="' + shInp + 'font-size:13px;">' + keys.map(k => opt(k, k === 'ALL' ? 'Tất cả chi nhánh' : 'Chỉ chi nhánh ' + k)).join('') + '</select>'
+        + (_ntEditId ? '<div style="background:#fff3cd;border:1px solid #f0c36d;border-radius:6px;padding:6px;margin-bottom:6px;font-size:12px;">✏️ Đang SỬA thông báo lúc <b>' + ntTime(_ntEditId) + '</b> <button type="button" onclick="openNoticeModal()" style="margin-left:6px;">Hủy sửa</button></div>' : '')
+        + '<label style="' + lab + '">Áp dụng cho:</label><select id="nt-scope" onchange="fillNoticeForm()"' + (_ntEditId ? ' disabled' : '') + ' style="' + shInp + 'font-size:13px;">' + keys.map(k => opt(k, k === 'ALL' ? 'Tất cả chi nhánh' : 'Chỉ chi nhánh ' + k)).join('') + '</select>'
         + '<label style="' + lab + '">Soạn nhanh từ mẫu:</label><select id="nt-tpl" onchange="applyNoticeTpl()" style="' + shInp + 'font-size:13px;">' + opt('', '-- Chọn mẫu (không bắt buộc) --') + opt('off_today', '🔴 Hôm nay quán nghỉ') + opt('holiday', '🔴 Nghỉ lễ') + opt('soldout', '📢 Một số món tạm hết') + opt('hours', '📢 Đổi giờ mở cửa') + opt('promo', '🎁 Khuyến mãi') + '</select>'
         + '<label style="' + lab + '">Loại:</label><select id="nt-type" style="' + shInp + 'font-size:13px;">' + opt('closed', '🔴 Nghỉ / đóng cửa') + opt('info', '📢 Thông báo thường') + opt('promo', '🎁 Khuyến mãi') + '</select>'
         + '<label style="' + lab + '">Tiêu đề:</label><input id="nt-title" maxlength="80" style="' + shInp + 'font-size:13px;">'
@@ -1816,11 +1836,30 @@ main { min-height: 0; }
         + '<label style="font-size:13px;display:block;margin-bottom:8px;"><input type="checkbox" id="nt-block"> ⛔ Chặn khách đặt món online trong thời gian này (chỉ áp dụng cho loại "Nghỉ")</label>'
         + '<div id="sh-msg" style="color:#c1121f;font-weight:bold;margin-bottom:6px;"></div>'
         + '<button style="' + shBtn + 'background:#2a9d8f;" onclick="saveNotice(true)">💾 LƯU & HIỆN CHO KHÁCH</button>'
+        + (_ntEditId ? '<button style="' + shBtn + 'background:#457b9d;" onclick="saveNotice(true, true)">📝 CHỈ LƯU SỬA (không bật lại pop-up)</button>' : '')
         + '<button style="' + shBtn + 'background:#e07a00;" onclick="saveNotice(false)">⏸ TẮT THÔNG BÁO NÀY</button>'
-        + '<button style="' + shBtn + 'background:#6c757d;" onclick="closeShiftModal()">Đóng</button>');
-      fillNoticeForm();
+        + '<button style="' + shBtn + 'background:#6c757d;" onclick="closeShiftModal()">Đóng</button>'
+        + '<div id="nt-view"></div>'
+        + '<h4 style="margin:14px 0 6px;color:#8b1f1f;">🕘 Lịch sử thông báo</h4>' + hist);
+      if (_ntEditId && _ntLog[_ntEditId]) {
+        const r = _ntLog[_ntEditId], set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
+        set('nt-scope', r.scope); set('nt-type', r.type); set('nt-title', r.title); set('nt-msg', r.message); set('nt-from', r.from); set('nt-to', r.to);
+        const b = document.getElementById('nt-block'); if (b) b.checked = !!r.block;
+      } else fillNoticeForm();
     }
+    function viewNotice(id) {
+      const r = _ntLog[id]; if (!r) return;
+      const on = Object.keys(_ntData).some(k => _ntData[k] && _ntData[k].enabled && _ntData[k].logId === id);
+      document.getElementById('nt-view').innerHTML = '<div style="margin-top:10px;border:2px solid #457b9d;border-radius:8px;padding:8px;background:#f1f7fb;">'
+        + '<div style="font-weight:bold;">👁 ' + ntEsc(r.title || '(không tiêu đề)') + '</div>'
+        + '<div style="white-space:pre-line;margin:6px 0;">' + ntEsc(r.message) + '</div>'
+        + '<div style="font-size:11px;color:#555;">Loại: ' + (ntTypeLbl[r.type] || '') + ' · Áp dụng: ' + (r.scope === 'ALL' ? 'Tất cả chi nhánh' : ntEsc(r.scope)) + (r.block ? ' · ⛔ chặn đặt món' : '') + '<br>Hiện: ' + (r.from || 'ngay') + ' → ' + (r.to || 'khi bấm tắt') + '<br>Đăng lúc ' + ntTime(r.createdAt || id) + ' bởi ' + ntEsc(r.createdBy || '') + (r.updatedAt && r.updatedAt !== r.createdAt ? ' · sửa lúc ' + ntTime(r.updatedAt) + ' bởi ' + ntEsc(r.updatedBy || '') : '') + '<br>Trạng thái: ' + (on ? '<b style="color:#2a9d8f;">đang hiện cho khách</b>' : 'đã tắt') + '</div>'
+        + '<button type="button" style="margin-top:6px;" onclick="document.getElementById(\'nt-view\').innerHTML=\'\'">Đóng xem</button></div>';
+      document.getElementById('nt-view').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    function editNotice(id) { _ntEditId = id; openNoticeModal(true); }
     function fillNoticeForm() {
+      if (_ntEditId) return;
       const k = shVal('nt-scope') || 'ALL', n = _ntData[k] || {}, set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
       set('nt-type', n.type || 'closed'); set('nt-title', n.title); set('nt-msg', n.message); set('nt-from', n.from); set('nt-to', n.to);
       const b = document.getElementById('nt-block'); if (b) b.checked = !!n.block; set('nt-tpl', '');
@@ -1830,22 +1869,27 @@ main { min-height: 0; }
       document.getElementById('nt-type').value = t[0]; document.getElementById('nt-title').value = t[1]; document.getElementById('nt-msg').value = t[2];
       document.getElementById('nt-block').checked = t[0] === 'closed';
     }
-    async function saveNotice(on) {
+    async function saveNotice(on, histOnly) {
       if (!can('noticeManage')) return alert('⚠️ Bạn chưa được cấp quyền đăng thông báo cho khách.');
-      const scope = shVal('nt-scope') || 'ALL', type = shVal('nt-type'), title = shVal('nt-title'), msg = document.getElementById('nt-msg').value.trim(), from = shVal('nt-from'), to = shVal('nt-to');
+      const scope = _ntEditId && _ntLog[_ntEditId] ? _ntLog[_ntEditId].scope : (shVal('nt-scope') || 'ALL'), type = shVal('nt-type'), title = shVal('nt-title'), msg = document.getElementById('nt-msg').value.trim(), from = shVal('nt-from'), to = shVal('nt-to');
       const now = Date.now(), who = CURRENT_USER_NAME || '';
       try {
         if (!on) {
           if (!_ntData[scope]) return shMsg('Chưa có thông báo nào ở mục này để tắt.');
           await db.ref('shopNotice/' + scope).update({ enabled: false, updatedAt: now, updatedBy: who });
           auditEvent('tắt thông báo khách', [scope === 'ALL' ? 'Tất cả chi nhánh' : scope]);
-          alert('✔ Đã tắt thông báo. Khách không còn thấy pop-up này.'); return openNoticeModal();
+          alert('✔ Đã tắt thông báo. Khách không còn thấy pop-up này.'); _ntEditId = null; return openNoticeModal();
         }
         if (!title && !msg) return shMsg('Nhập tiêu đề hoặc nội dung.');
         if (from && to && to < from) return shMsg('Ngày kết thúc phải sau ngày bắt đầu.');
-        await db.ref('shopNotice/' + scope).set({ enabled: true, type, title, message: msg, from: from || '', to: to || '', block: type === 'closed' && document.getElementById('nt-block').checked, id: now, updatedAt: now, updatedBy: who });
-        auditEvent('đăng thông báo khách', [(scope === 'ALL' ? 'Tất cả chi nhánh' : scope) + ': ' + (title || msg).slice(0, 80)]);
-        alert('✔ Đã đăng. Khách mở app (hoặc đang mở sẵn) sẽ thấy pop-up ngay.'); openNoticeModal();
+        const block = type === 'closed' && document.getElementById('nt-block').checked;
+        const logId = _ntEditId || String(now), old = _ntLog[logId] || {};
+        await db.ref('shopNoticeLog/' + logId).set({ scope, type, title, message: msg, from: from || '', to: to || '', block, createdAt: old.createdAt || now, createdBy: old.createdBy || who, updatedAt: now, updatedBy: who });
+        const isLive = _ntData[scope] && _ntData[scope].logId === logId;
+        if (histOnly) { if (isLive) await db.ref('shopNotice/' + scope).update({ type, title, message: msg, from: from || '', to: to || '', block, updatedAt: now, updatedBy: who }); }
+        else await db.ref('shopNotice/' + scope).set({ enabled: true, type, title, message: msg, from: from || '', to: to || '', block, id: now, logId, updatedAt: now, updatedBy: who });
+        auditEvent((_ntEditId ? 'sửa' : 'đăng') + ' thông báo khách', [(scope === 'ALL' ? 'Tất cả chi nhánh' : scope) + ': ' + (title || msg).slice(0, 80)]);
+        alert(histOnly ? '✔ Đã lưu bản sửa.' : '✔ Đã đăng. Khách mở app (hoặc đang mở sẵn) sẽ thấy pop-up ngay.'); _ntEditId = null; openNoticeModal();
       } catch (e) { shMsg('Không lưu được: ' + (e && e.message ? e.message : e)); }
     }
 
@@ -4084,10 +4128,10 @@ function setHistoryFilterRange(rangeType) {
 
     function initFirebase() {
       const defaultCfg = {
-        apiKey: "AIzaSyApb4ToaYfDaEy-66krGOcL365uFg-XSQc",
-        authDomain: "xecuoncong-1043.firebaseapp.com",
-        databaseURL: "https://xecuoncong-1043-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "xecuoncong-1043"
+        apiKey: "DAN_API_KEY_MOI",
+        authDomain: "TEN-PROJECT-MOI.firebaseapp.com",
+        databaseURL: "https://TEN-PROJECT-MOI-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "TEN-PROJECT-MOI"
       };
       let cfg = defaultCfg;
       let saved = localStorage.getItem(CONFIG_KEY);
@@ -5565,5 +5609,6 @@ function prepareBillHTML(orderData, branchNameOverride) {
     listenPromotions();
 
      </script>
+<script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 </body>
 </html>
