@@ -591,6 +591,7 @@ main { min-height: 0; }
       </div>
       <div style="display:flex; gap:6px; margin-bottom:8px;">
         <button class="btn-quick-filter" id="online-tab-pending" onclick="switchOnlineTab('pending')">📲 Đơn chờ (<span id="online-tab-pending-count">0</span>)</button>
+        <button class="btn-quick-filter" id="online-tab-scheduled" onclick="switchOnlineTab('scheduled')">📅 Đặt trước đã nhận (<span id="online-tab-scheduled-count">0</span>)</button>
         <button class="btn-quick-filter" id="online-tab-cancelled" onclick="switchOnlineTab('cancelled')">❌ Đơn đã hủy (<span id="online-tab-cancelled-count">0</span>)</button>
       </div>
       <div id="online-orders-container" style="overflow-x:auto;">Đang tải danh sách đơn trực tuyến...</div>
@@ -1403,7 +1404,7 @@ main { min-height: 0; }
       const open = mode === 'open';
       const label = open ? 'XÁC NHẬN MỞ CA' : 'XÁC NHẬN KẾT CA';
       shiftModal('<h3 style="margin:0 0 8px;color:#8b1f1f;">' + (open ? '🟢 MỞ CA LÀM VIỆC' : '🔴 KẾT CA') + ' — ' + CURRENT_USER_NAME + '</h3>'
-        + (ctx.stale ? '<div style="background:#fff3cd;padding:8px;border-radius:6px;margin-bottom:8px;">⚠️ Ca của <b>' + ctx.stale.staffName + '</b> (mở ' + shTime(ctx.stale.openAt) + ') chưa được kết. Số tiền bạn đếm bây giờ sẽ dùng để kết ca đó và làm tiền đầu ca của bạn.</div>' : '')
+        + (ctx.stale ? '<div style="background:#fff3cd;padding:8px;border-radius:6px;margin-bottom:8px;">⚠️ Ca của <b>' + escHtmlOnline(ctx.stale.staffName) + '</b> (mở ' + shTime(ctx.stale.openAt) + ') chưa được kết. Số tiền bạn đếm bây giờ sẽ dùng để kết ca đó và làm tiền đầu ca của bạn.</div>' : '')
         + '<div id="sh-panel" style="background:#f8f4ee;border:1px solid #e2d4c3;border-radius:8px;padding:8px;margin-bottom:8px;font-size:12px;line-height:1.7;">⏳ Đang tính tiền mặt...</div>'
         + '<label><b>' + (open ? 'Tiền mặt đếm được trong két lúc nhận ca (đ):' : 'Tiền mặt thực tế đếm được trong két lúc kết ca (đ):') + '</b></label>'
         + '<input id="sh-cash" inputmode="numeric" oninput="shLive()" placeholder="Nhập số tiền đếm được" style="' + shInp + '">'
@@ -1427,7 +1428,7 @@ main { min-height: 0; }
         calcShift(ctx.stale.id).then(c => {
           const exp = (Number(c.sh.openCash) || 0) + c.cashSales + (c.cashIn - c.cashOut);
           _shCalc = { mode: 'open', expected: exp };
-          panel('Ca của <b>' + c.sh.staffName + '</b>: ' + ln('đầu ca', c.sh.openCash) + ln('+ bán tiền mặt (' + c.cashCount + ' đơn):', c.cashSales) + '= <b>Dự kiến trong két:</b> <b style="color:#8b1f1f;font-size:16px;">' + shMoney(exp) + 'đ</b>');
+          panel('Ca của <b>' + escHtmlOnline(c.sh.staffName) + '</b>: ' + ln('đầu ca', c.sh.openCash) + ln('+ bán tiền mặt (' + c.cashCount + ' đơn):', c.cashSales) + '= <b>Dự kiến trong két:</b> <b style="color:#8b1f1f;font-size:16px;">' + shMoney(exp) + 'đ</b>');
           shLive();
         }).catch(() => panel('Không tính được tiền ca trước.'));
       } else {
@@ -1532,10 +1533,10 @@ main { min-height: 0; }
       const snap = await db.ref(shBase()).limitToLast(60).once('value'); const rows = [];
       snap.forEach(c => rows.push(c.val())); rows.sort((a, b) => (b.openAt || 0) - (a.openAt || 0));
       const col = d => d < 0 ? '#c1121f' : d > 0 ? '#e07a00' : '#2a9d8f';
-      const tr = rows.map(r => '<tr><td>' + r.staffName + '</td><td>' + shTime(r.openAt) + '<br>' + (r.closeAt ? shTime(r.closeAt) : '<i>đang mở</i>') + '</td><td>' + shMoney(r.openCash) + '</td>'
+      const tr = rows.map(r => '<tr><td>' + escHtmlOnline(r.staffName) + '</td><td>' + shTime(r.openAt) + '<br>' + (r.closeAt ? shTime(r.closeAt) : '<i>đang mở</i>') + '</td><td>' + shMoney(r.openCash) + '</td>'
         + '<td style="color:' + col(r.handoverDiff || 0) + ';font-weight:bold;">' + shMoney(r.handoverDiff || 0) + '</td>'
         + (r.status === 'closed' ? '<td>' + shMoney(r.cashSales) + '</td><td>' + shMoney(r.payouts) + '</td><td>' + shMoney(r.expectedCash) + '</td><td>' + shMoney(r.closeCash) + '</td><td style="color:' + col(r.diff) + ';font-weight:bold;">' + shMoney(r.diff) + '</td>' : '<td colspan="5"><i>chưa kết ca</i></td>')
-        + '<td style="text-align:left;">' + [r.handoverNote, r.closeNote, r.forcedClose ? '(kết hộ)' : ''].filter(Boolean).join(' | ') + '</td></tr>').join('');
+        + '<td style="text-align:left;">' + escHtmlOnline([r.handoverNote, r.closeNote, r.forcedClose ? '(kết hộ)' : ''].filter(Boolean).join(' | ')) + '</td></tr>').join('');
       shiftModal('<h3 style="margin:0 0 8px;">📒 Báo cáo ca (60 ca gần nhất) — ' + CURRENT_BRANCH + '</h3><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px;" border="1" cellpadding="5"><tr style="background:#f1e7e0;"><th>Nhân viên</th><th>Mở / Kết</th><th>Đầu ca</th><th>Lệch bàn giao</th><th>Tiền mặt bán</th><th>Chi</th><th>Dự kiến</th><th>Thực đếm</th><th>Chênh lệch</th><th>Ghi chú</th></tr>' + (tr || '<tr><td colspan="10">Chưa có ca nào</td></tr>') + '</table></div><p style="font-size:11px;color:#666;">Chênh lệch = Thực đếm − (Đầu ca + Tiền mặt bán − Chi). Âm = thiếu tiền, dương = dư.</p><button style="' + shBtn + 'background:#6c757d;" onclick="closeShiftModal()">Đóng</button>', true);
     }
     async function auditOrder(branch, action, o, after, changes) {
@@ -1556,7 +1557,7 @@ main { min-height: 0; }
       snaps.forEach((snap, i) => { if (snap) snap.forEach(c => { const v = c.val() || {}; v._br = v.branch || brs[i]; rows.push(v); }); });
       rows.sort((a, b) => (b.at || 0) - (a.at || 0)); rows.length = Math.min(rows.length, 100);
       rows.forEach(r => { r.before = r.before || { total: 0, payMethod: '' }; r.action = String(r.action || ''); r.by = r.by || ''; r.invoice = r.invoice || ''; r.orderTime = r.orderTime || ''; });
-      const tr = rows.map(r => '<tr><td>' + shTime(r.at) + '</td><td>' + r.by + '</td><td style="font-weight:bold;color:' + (r.action === 'xóa' ? '#c1121f' : '#e07a00') + ';">' + r.action.toUpperCase() + '</td><td>' + r.invoice + '<br><small>' + r.orderTime + '</small>' + (brs.length > 1 ? '<br><small style="color:#6d597a;">' + escHtmlOnline(r._br) + '</small>' : '') + '</td><td>' + (r.orderId ? shMoney(r.before.total) : '—') + '<br><small>' + r.before.payMethod + '</small></td><td>' + (r.after ? shMoney(r.after.total) + '<br><small>' + r.after.payMethod + '</small>' : '—') + '</td><td style="text-align:left;font-size:11px;">' + auditDetail(r) + '</td></tr>').join('');
+      const tr = rows.map(r => '<tr><td>' + shTime(r.at) + '</td><td>' + escHtmlOnline(r.by) + '</td><td style="font-weight:bold;color:' + (r.action.indexOf('xóa') === 0 ? '#c1121f' : '#e07a00') + ';">' + escHtmlOnline(r.action.toUpperCase()) + '</td><td>' + escHtmlOnline(r.invoice) + '<br><small>' + escHtmlOnline(r.orderTime) + '</small>' + (brs.length > 1 ? '<br><small style="color:#6d597a;">' + escHtmlOnline(r._br) + '</small>' : '') + '</td><td>' + (r.orderId ? shMoney(r.before.total) : '—') + '<br><small>' + escHtmlOnline(r.before.payMethod) + '</small></td><td>' + (r.after ? shMoney(r.after.total) + '<br><small>' + escHtmlOnline(r.after.payMethod) + '</small>' : '—') + '</td><td style="text-align:left;font-size:11px;">' + auditDetail(r) + '</td></tr>').join('');
       shiftModal('<h3 style="margin:0 0 8px;">🧾 Nhật ký sửa/xóa đơn (100 gần nhất) — ' + CURRENT_BRANCH + '</h3><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px;" border="1" cellpadding="5"><tr style="background:#f1e7e0;"><th>Lúc</th><th>Người làm</th><th>Việc</th><th>Hóa đơn</th><th>Trước khi sửa</th><th>Sau khi sửa</th><th>Chi tiết thay đổi</th></tr>' + (tr || '<tr><td colspan="7">Chưa có</td></tr>') + '</table></div><button style="' + shBtn + 'background:#6c757d;" onclick="closeShiftModal()">Đóng</button>', true);
     }
     // ===== HẾT QUẢN LÝ CA =====
@@ -1698,6 +1699,16 @@ main { min-height: 0; }
       alert(CURRENT_ROLE === 'GUEST' ? '⚠️ Bạn chưa đăng nhập ca làm việc!' : '⚠️ Bạn chưa được cấp quyền "' + label + '".\nHãy nhờ BOD hoặc quản lý cấp quyền cho tài khoản của bạn.');
       return false;
     }
+    // Viết hoa chữ cái đầu mỗi từ trong tên (hỗ trợ tiếng Việt): "anh tài" -> "Anh Tài"
+    function titleCaseName(str) {
+      return String(str || '').replace(/\s+/g, ' ').trim()
+        .toLocaleLowerCase('vi')
+        .replace(/(^|[\s\-'’.(])(\p{L})/gu, (m, a, b) => a + b.toLocaleUpperCase('vi'));
+    }
+    document.addEventListener('focusout', e => {
+      const t = e.target;
+      if (t && (t.id === 'cust-name' || t.id === 'edit-cust-name' || t.id === 'eo-name')) t.value = titleCaseName(t.value);
+    });
     // Ghi một sự kiện (không gắn với đơn cụ thể) vào nhật ký của chi nhánh
     async function auditEvent(action, changes) {
       if (!db) return;
@@ -1706,7 +1717,8 @@ main { min-height: 0; }
           at: Date.now(), action, by: CURRENT_USER_NAME || '', byPhone: CURRENT_USER_PHONE || '', orderId: '', invoice: '', orderTime: '',
           before: { total: 0, payMethod: '', name: '', phone: '', items: '' }, changes: (changes || []).map(x => String(x).slice(0, 200)), after: null
         });
-      } catch (e) { console.warn('audit', e); }
+        return true;
+      } catch (e) { console.warn('audit', e); return false; }
     }
 
     // ---- khóa giảm giá tay: không có quyền thì ô nhập bị khóa ----
@@ -2942,7 +2954,7 @@ main { min-height: 0; }
         if (promo) {
           billDiscount = billPromoAmount(promo, itemsAfterLine);
           billLabel = promo.name + (promo.mode === 'percent' ? ` (${promo.value}%)` : '');
-        } else if (currentCustomerVipDiscount) {
+        } else if (currentCustomerVipDiscount && !ONLINE_PAID_CART) {
           billDiscount = Math.round(itemsAfterLine * 0.05);
           billLabel = 'Giảm giá VIP (5%)';
         }
@@ -3145,7 +3157,15 @@ main { min-height: 0; }
       setTimeout(() => { const e = document.getElementById('cash-given'); if (e) { try { e.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) {} e.focus(); if (e.select) e.select(); } }, 60);
     }
 
-        function checkCustomerPhone() {
+    // Chuẩn hóa SĐT Việt Nam để khớp khách cũ: "+84 912 345 678" / "0912.345.678" -> "0912345678"
+    function normalizePhoneVN(p) {
+      let d = String(p || '').replace(/\D/g, '');
+      if (d.startsWith('84') && d.length >= 11) d = '0' + d.slice(2);
+      else if (d.length === 9 && d[0] !== '0') d = '0' + d;
+      return d;
+    }
+    // keepOrderInfo = true (đơn online): chỉ tra điểm/VIP, KHÔNG ghi đè tên & địa chỉ giao hàng của đơn
+    function checkCustomerPhone(keepOrderInfo) {
       const phone = document.getElementById('cust-phone').value.trim();
       const memberBox = document.getElementById('member-box');
       if (!phone || phone.length < 9) {
@@ -3157,11 +3177,12 @@ main { min-height: 0; }
       }
 
       if (db) {
-        db.ref('customers/' + phone).once('value').then(snapshot => {
+        return db.ref('customers/' + phone).once('value').then(snapshot => {
           if (snapshot.exists()) {
             const data = snapshot.val() || {};
-            document.getElementById('cust-name').value = data.name || '';
-            document.getElementById('cust-address').value = data.address || '';
+            const _n = document.getElementById('cust-name'), _a = document.getElementById('cust-address');
+            if (!keepOrderInfo || !_n.value.trim()) _n.value = data.name || '';
+            if (!keepOrderInfo || !_a.value.trim()) _a.value = data.address || '';
             currentCustomerPoints = data.points || 0;
             currentCustomerVipDiscount = !!data.vipDiscount;
             
@@ -3598,7 +3619,7 @@ function setHistoryFilterRange(rangeType) {
         }
       });
       const updates = {
-        name: document.getElementById('eo-name').value.trim() || 'Khách Lẻ', phone,
+        name: titleCaseName(document.getElementById('eo-name').value) || 'Khách Lẻ', phone,
         payMethod: document.getElementById('eo-pay').value, orderNote: document.getElementById('eo-note').value.trim(),
         items, itemsTotal: T.gross, lineDiscount: T.lineDisc, billDiscount: T.billDisc,
         discountLabel: T.billDisc > 0 ? (E.billLabel || 'Giảm giá') : '', discountAmount: T.lineDisc + T.billDisc,
@@ -4166,7 +4187,7 @@ function setHistoryFilterRange(rangeType) {
       }
       if (db) {
         db.ref('customers/' + newPhone).set({
-          name: document.getElementById('edit-cust-name').value.trim(),
+          name: titleCaseName(document.getElementById('edit-cust-name').value),
           address: document.getElementById('edit-cust-address').value.trim(),
           points: parseInt(document.getElementById('edit-cust-points').value) || 0,
           vipDiscount: document.getElementById('edit-cust-vip-discount').checked
@@ -5876,7 +5897,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
       if(cart.length === 0) return alert('Chưa chọn món nào!');
       const nextData = await generateNextInvoiceAndOrderNum();
       const phone = document.getElementById('cust-phone').value.trim();
-      const name = document.getElementById('cust-name').value.trim();
+      const name = titleCaseName(document.getElementById('cust-name').value);
       const address = document.getElementById('cust-address').value.trim();
       const shipFee = parseFloat(document.getElementById('ship-fee').value) || 0;
       const payMethod = document.getElementById('pay-method').value;
@@ -5952,6 +5973,7 @@ function prepareBillHTML(orderData, branchNameOverride) {
     let knownOnlineOrderIds = new Set();
     let onlineOrdersFirstLoad = true;
     let onlineModalTab = 'pending';
+    let scheduledPreOrdersCache = [];   // đơn đặt trước đã xác nhận, chờ tới giờ làm
 
     function cleanOnlineTxt(s, n) { return String(s == null ? '' : s).replace(/[<>]/g, '').slice(0, n || 200); }   // dữ liệu từ khách: bỏ < > rồi mới đưa vào POS
 function safeImgPOS(s) { s = String(s == null ? '' : s); return /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+\/=]+$/.test(s) ? s : ''; }   // chỉ nhận ảnh data:image
@@ -6059,6 +6081,7 @@ function escHtmlOnline(t) {
       onlineOrdersRef.on('value', snapshot => {
         onlineOrdersCache = [];
         cancelledOnlineOrdersCache = [];
+        scheduledPreOrdersCache = [];
         let hasNewOrder = false, newPreOrder = null;
         if (snapshot.exists()) {
           snapshot.forEach(child => {
@@ -6069,15 +6092,18 @@ function escHtmlOnline(t) {
                 knownOnlineOrderIds.add(child.key);
                 hasNewOrder = true; if (data.orderType === 'preorder') newPreOrder = data;
               }
+            } else if (data.status === 'Đặt trước đã nhận') {
+              scheduledPreOrdersCache.push({ ...data, id: String(child.key).replace(/[^\w-]/g, '') });
             } else if (data.status === 'Đã hủy') {
               cancelledOnlineOrdersCache.push({ ...data, id: String(child.key).replace(/[^\w-]/g, '') });
             }
           });
         }
         cancelledOnlineOrdersCache.sort((x, y) => (y.cancelledAt || 0) - (x.cancelledAt || 0));
-        { const np = onlineOrdersCache.filter(x => x.orderType === 'preorder').length; document.getElementById('online-count-badge').innerText = onlineOrdersCache.length + (np ? ' (📅' + np + ')' : ''); }
+        { const np = onlineOrdersCache.filter(x => x.orderType === 'preorder').length; document.getElementById('online-count-badge').innerText = onlineOrdersCache.length + (np ? ' (📅' + np + ')' : '') + (scheduledPreOrdersCache.length ? ' ⏰' + scheduledPreOrdersCache.length : ''); }
         document.getElementById('online-tab-pending-count').innerText = onlineOrdersCache.length;
         document.getElementById('online-tab-cancelled-count').innerText = cancelledOnlineOrdersCache.length;
+        { const sc = document.getElementById('online-tab-scheduled-count'); if (sc) sc.innerText = scheduledPreOrdersCache.length; }
 
         // Có đơn khách đặt MỚI (không tính các đơn có sẵn lúc vừa mở trang) -> phát nhạc báo
         if (hasNewOrder && !onlineOrdersFirstLoad) playNotificationSound(ONLINE_ALERT_REPEAT);
@@ -6105,7 +6131,7 @@ function escHtmlOnline(t) {
 
     function renderOnlineOrdersTable() {
       // Tô sáng tab đang chọn
-      [['pending', 'online-tab-pending'], ['cancelled', 'online-tab-cancelled']].forEach(([key, id]) => {
+      [['pending', 'online-tab-pending'], ['scheduled', 'online-tab-scheduled'], ['cancelled', 'online-tab-cancelled']].forEach(([key, id]) => {
         const btn = document.getElementById(id);
         if (!btn) return;
         const active = (onlineModalTab === key);
@@ -6115,6 +6141,13 @@ function escHtmlOnline(t) {
 
       const container = document.getElementById('online-orders-container');
 
+      if (onlineModalTab === 'scheduled') {
+        if (!scheduledPreOrdersCache.length) { container.innerHTML = '<p style="padding:15px; text-align:center;">Chưa có đơn đặt trước nào được xác nhận.<br><small style="color:#777;">Ở tab 📲 Đơn chờ, bấm "✅ Xác Nhận Đơn" ở đơn đặt trước để đưa vào danh sách này.</small></p>'; return; }
+        const list = scheduledPreOrdersCache.slice().sort((a, b) => parseMoney(a.pickupAt) - parseMoney(b.pickupAt));
+        container.innerHTML = '<div style="font-weight:bold;color:#6a4c93;border-bottom:3px solid #6a4c93;margin-bottom:8px;padding-bottom:3px;">📅 ĐƠN ĐẶT TRƯỚC ĐÃ XÁC NHẬN — xếp theo giờ hẹn (' + list.length + ')</div>'
+          + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;">' + list.map(o => '<div style="flex:1;min-width:330px;max-width:520px;">' + onlineCardHtml(o) + '</div>').join('') + '</div>';
+        return;
+      }
       if (onlineModalTab === 'cancelled') {
         if (cancelledOnlineOrdersCache.length === 0) { container.innerHTML = '<p style="padding:15px; text-align:center;">Chưa có đơn nào bị hủy.</p>'; return; }
         let html = '<table class="data-table"><thead><tr><th>Giờ Đặt</th><th>Khách</th><th>SĐT</th><th>Tổng Tiền</th><th>Món</th><th>Lý Do Hủy</th><th>Người Hủy</th><th>Giờ Hủy</th><th>Thao Tác</th></tr></thead><tbody>';
@@ -6141,11 +6174,15 @@ function escHtmlOnline(t) {
       if (pre) {
         const diff = Math.round((parseMoney(o.pickupAt) - Date.now()) / 60000);
         const left = diff >= 0 ? (diff >= 60 ? 'còn ' + Math.floor(diff / 60) + 'h' + (diff % 60) + 'p' : 'còn ' + diff + ' phút') : 'QUÁ HẸN ' + (-diff) + ' phút';
-        head = '<div style="background:' + (diff < 0 ? '#c1121f' : diff <= 30 ? '#e65100' : '#6a4c93') + ';color:#fff;padding:6px 8px;font-weight:bold;border-radius:6px 6px 0 0;">📅 ĐẶT TRƯỚC · GIỜ HẸN: ' + e(o.pickupLabel || '') + ' (' + left + ')</div>';
+        head = '<div style="background:' + (diff < 0 ? '#c1121f' : diff <= 30 ? '#e65100' : '#6a4c93') + ';color:#fff;padding:6px 8px;font-weight:bold;border-radius:6px 6px 0 0;">📅 ĐẶT TRƯỚC' + (o.status === 'Đặt trước đã nhận' ? ' ✅ ĐÃ XÁC NHẬN' : '') + ' · GIỜ HẸN: ' + e(o.pickupLabel || '') + ' (' + left + ')</div>';
       } else head = '<div style="background:#2a9d8f;color:#fff;padding:6px 8px;font-weight:bold;border-radius:6px 6px 0 0;">⚡ ĐẶT NGAY · ' + e(o.time) + '</div>';
-      const btn = isOnlinePaid(o)
-        ? '<button class="btn-action btn-edit" onclick="acceptOnlineOrder(\'' + o.id + '\')">✅ Nhận Đơn</button>'
-        : '<button class="btn-action btn-edit" style="background:#e65100;" onclick="confirmOnlinePayment(\'' + o.id + '\')">💰 Đã Nhận Tiền</button>';
+      const sched = o.status === 'Đặt trước đã nhận';
+      let btn;
+      if (sched) btn = '<button class="btn-action btn-edit" onclick="acceptOnlineOrder(\'' + o.id + '\')">🍳 Làm Đơn</button>';
+      else if (!isOnlinePaid(o)) btn = '<button class="btn-action btn-edit" style="background:#e65100;" onclick="confirmOnlinePayment(\'' + o.id + '\')">💰 Đã Nhận Tiền</button>';
+      else if (pre) btn = '<button class="btn-action btn-edit" onclick="confirmPreOrder(\'' + o.id + '\')">✅ Xác Nhận Đơn</button><button class="btn-action btn-edit" style="background:#6a4c93;" onclick="acceptOnlineOrder(\'' + o.id + '\')">🍳 Làm Ngay</button>';
+      else btn = '<button class="btn-action btn-edit" onclick="acceptOnlineOrder(\'' + o.id + '\')">✅ Nhận Đơn</button>';
+      const editDel = '<button class="btn-action btn-edit" style="background:#457b9d;" onclick="openEditOnlineOrder(\'' + o.id + '\')">✏️ Sửa</button><button class="btn-action btn-del" onclick="deleteActiveOnlineOrder(\'' + o.id + '\')">🗑️ Xóa</button>';
       return '<div style="border:1px solid #d9c9b6;border-radius:8px;margin-bottom:8px;background:#fff;">' + head
         + '<div style="padding:8px;font-size:12px;line-height:1.5;">'
         + '<div><b>' + e(o.name) + '</b> · <strong>' + e(o.phone) + '</strong></div>'
@@ -6153,8 +6190,77 @@ function escHtmlOnline(t) {
         + (o.note ? '<div style="color:#8b1f1f;">📝 ' + e(o.note) + '</div>' : '')
         + '<div style="margin:4px 0;">' + onlineItemsHtml(o) + '</div>'
         + '<div>' + onlineTotalHtml(o) + onlineCheckHtml(o) + onlinePayHtml(o) + '</div>'
-        + '<div style="margin-top:6px;white-space:nowrap;">' + btn + '<button class="btn-action btn-del" onclick="openCancelOnlineModal(\'' + o.id + '\')">❌ Hủy Đơn</button></div>'
+        + '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">' + btn + editDel + '<button class="btn-action btn-del" onclick="openCancelOnlineModal(\'' + o.id + '\')">❌ Hủy Đơn</button></div>'
         + '</div></div>';
+    }
+
+    // ----- ĐƠN ĐẶT TRƯỚC: xác nhận -> vào danh sách hẹn giờ; sửa; xóa -----
+    async function confirmPreOrder(orderId) {
+      if (!can('online')) return alert('⚠️ Bạn chưa được cấp quyền xử lý đơn online.');
+      const order = onlineOrdersCache.find(o => o.id === orderId);
+      if (!order) return;
+      if (!isOnlinePaid(order)) return alert('⚠️ Đơn này chưa xác nhận đã nhận tiền. Hãy kiểm tra ngân hàng rồi bấm "💰 Đã Nhận Tiền" trước.');
+      if (!db) return alert('Chưa kết nối Firebase!');
+      try {
+        await db.ref('branches/' + CURRENT_BRANCH + '/online_orders/' + orderId).update({ status: 'Đặt trước đã nhận', confirmedAt: Date.now(), confirmedBy: CURRENT_USER_NAME || 'Nhân viên' });
+        posToast('✅ Đã xác nhận đơn đặt trước · hẹn ' + (order.pickupLabel || '') + ' → xem ở tab 📅 Đặt trước đã nhận');
+      } catch (e) { alert('Không xác nhận được đơn: ' + (e && e.message ? e.message : e)); }
+    }
+    function findOnlineOrderAny(orderId) { return onlineOrdersCache.find(x => x.id === orderId) || scheduledPreOrdersCache.find(x => x.id === orderId); }
+    function openEditOnlineOrder(orderId) {
+      if (!can('online')) return alert('⚠️ Bạn chưa được cấp quyền xử lý đơn online.');
+      const o = findOnlineOrderAny(orderId);
+      if (!o) return alert('Không tìm thấy đơn này (có thể đã được xử lý)!');
+      const e = escHtmlOnline, pad = n => String(n).padStart(2, '0'), lab = 'font-size:12px;font-weight:bold;color:#555;';
+      const pre = o.orderType === 'preorder' && parseMoney(o.pickupAt) > 0;
+      let dtv = '';
+      if (pre) { const d = new Date(parseMoney(o.pickupAt)); dtv = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+      shiftModal('<h3 style="margin:0 0 6px;color:#8b1f1f;">✏️ Sửa đơn khách đặt</h3>'
+        + '<div style="font-size:12px;color:#555;background:#f6f1ea;border-radius:6px;padding:6px;margin-bottom:6px;"><b>Món:</b> ' + onlineItemsHtml(o) + '<br><b>Tổng:</b> ' + resolveOnlineTotal(o).value.toLocaleString() + 'đ<br><small style="color:#8b1f1f;">Không sửa món/số tiền ở đây (khách đã thanh toán theo số tiền này). Cần đổi món: bấm "Làm Đơn" rồi chỉnh trong giỏ.</small></div>'
+        + '<label style="' + lab + '">Tên khách</label><input id="eoo-name" style="' + shInp + '" value="' + e(o.name || '') + '">'
+        + '<label style="' + lab + '">SĐT</label><input id="eoo-phone" type="tel" style="' + shInp + '" value="' + e(o.phone || '') + '">'
+        + '<label style="' + lab + '">Địa chỉ</label><input id="eoo-address" style="' + shInp + '" value="' + e(o.address || '') + '">'
+        + '<label style="' + lab + '">Ghi chú</label><input id="eoo-note" style="' + shInp + '" value="' + e(o.note || '') + '">'
+        + (pre ? '<label style="' + lab + '">Giờ hẹn</label><input id="eoo-pickup" type="datetime-local" style="' + shInp + '" value="' + dtv + '">' : '')
+        + '<div style="display:flex;gap:8px;margin-top:6px;"><button class="btn-action btn-del" style="flex:1;padding:10px;" onclick="closeShiftModal()">Hủy</button><button class="btn-action btn-edit" style="flex:2;padding:10px;" onclick="saveEditOnlineOrder(\'' + o.id + '\')">💾 Lưu thay đổi</button></div>');
+    }
+    async function saveEditOnlineOrder(orderId) {
+      const o = findOnlineOrderAny(orderId);
+      if (!o) { closeShiftModal(); return alert('Không tìm thấy đơn này (có thể đã được xử lý)!'); }
+      const name = titleCaseName(cleanOnlineTxt(shVal('eoo-name'), 100)), phone = normalizePhoneVN(cleanOnlineTxt(shVal('eoo-phone'), 20));
+      const address = cleanOnlineTxt(shVal('eoo-address'), 300), note = cleanOnlineTxt(shVal('eoo-note'), 300);
+      if (!name) return alert('Nhập tên khách!');
+      if (phone.length < 9) return alert('SĐT không hợp lệ!');
+      const updates = { name, phone, address, note }, ch = [];
+      const diff = (lbl, a, b) => { if (String(a || '') !== String(b || '')) ch.push(lbl + ': ' + (a || '—') + ' → ' + (b || '—')); };
+      diff('Tên', o.name, name); diff('SĐT', o.phone, phone); diff('Địa chỉ', o.address, address); diff('Ghi chú', o.note, note);
+      if (document.getElementById('eoo-pickup')) {
+        const v = shVal('eoo-pickup'), ms = new Date(v).getTime();
+        if (!v || isNaN(ms)) return alert('Chọn giờ hẹn hợp lệ!');
+        const d = new Date(ms), pad = n => String(n).padStart(2, '0');
+        const label = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
+        if (ms !== parseMoney(o.pickupAt)) { updates.pickupAt = ms; updates.pickupLabel = label; ch.push('Giờ hẹn: ' + (o.pickupLabel || '—') + ' → ' + label); }
+      }
+      if (!ch.length) { closeShiftModal(); return; }
+      if (!db) return alert('Chưa kết nối Firebase!');
+      updates.editedAt = Date.now(); updates.editedBy = CURRENT_USER_NAME || 'Nhân viên';
+      const logged = await auditEvent('sửa đơn online', [(o.name || 'Khách') + ' · ' + (o.phone || '') + ' · ' + resolveOnlineTotal(o).value.toLocaleString() + 'đ'].concat(ch));
+      if (!logged) return alert('❌ Không ghi được nhật ký nên CHƯA lưu thay đổi. Kiểm tra mạng / quyền ghi auditLog.');
+      try { await db.ref('branches/' + CURRENT_BRANCH + '/online_orders/' + orderId).update(updates); closeShiftModal(); posToast('✅ Đã sửa đơn của ' + name); }
+      catch (e) { alert('Không lưu được: ' + (e && e.message ? e.message : e)); }
+    }
+    async function deleteActiveOnlineOrder(orderId) {
+      if (!(await requirePerm('onlineCancel', 'Xóa đơn online'))) return;
+      const o = findOnlineOrderAny(orderId);
+      if (!o) return alert('Không tìm thấy đơn này (có thể đã được xử lý)!');
+      const total = resolveOnlineTotal(o).value, paid = isOnlinePaid(o);
+      const reason = (prompt('⚠️ XÓA đơn của ' + (o.name || 'khách') + ' (' + (o.phone || '---') + ') — ' + total.toLocaleString() + 'đ?' + (paid ? '\n\n💰 Khách ĐÃ CHUYỂN KHOẢN đơn này — nhớ hoàn tiền cho khách.' : '') + '\n\nGhi lý do xóa (bắt buộc, được lưu vào nhật ký):', '') || '').trim();
+      if (!reason) return alert('Chưa ghi lý do nên chưa xóa đơn.');
+      if (!db) return alert('Chưa kết nối Firebase!');
+      const logged = await auditEvent('xóa đơn online', ['📝 Lý do: ' + reason.slice(0, 120), (o.name || '') + ' · ' + (o.phone || '') + ' · ' + total.toLocaleString() + 'đ' + (paid ? ' · ĐÃ CHUYỂN KHOẢN' : '') + (o.pickupLabel ? ' · hẹn ' + o.pickupLabel : ''), 'Món: ' + onlineItemsOf(o).map(i => i.name + ' x' + (parseMoney(i.qty) || 1)).join('; ')]);
+      if (!logged) return alert('❌ Không ghi được nhật ký nên CHƯA xóa đơn. Kiểm tra mạng / quyền ghi auditLog.');
+      try { await db.ref('branches/' + CURRENT_BRANCH + '/online_orders/' + orderId).remove(); posToast('🗑️ Đã xóa đơn của ' + (o.name || 'khách')); }
+      catch (e) { alert('Không xóa được: ' + (e && e.message ? e.message : e)); }
     }
 
     // ----- Hủy đơn khách đặt (bắt buộc ghi lý do) -----
@@ -6229,7 +6335,7 @@ function escHtmlOnline(t) {
 
     async function acceptOnlineOrder(orderId) {
       if (!can('online')) return alert('⚠️ Bạn chưa được cấp quyền xử lý đơn online.');
-      const order = onlineOrdersCache.find(o => o.id === orderId);
+      const order = onlineOrdersCache.find(o => o.id === orderId) || scheduledPreOrdersCache.find(o => o.id === orderId);
       if (!order) return;
       if (order.orderType === 'preorder') { if (!confirm('📅 ĐƠN ĐẶT TRƯỚC — giờ hẹn: ' + (order.pickupLabel || '') + '\nNạp đơn vào giỏ ngay bây giờ?')) return; }
       else if (SHOP_HOURS.enabled && !isShopOpenPOS()) { if (!confirm('⏰ Đang NGOÀI giờ mở cửa (' + hhmmP(SHOP_HOURS.openMin) + ' – ' + hhmmP(SHOP_HOURS.closeMin) + ').\nVẫn nhận đơn này?')) return; }
@@ -6238,8 +6344,8 @@ function escHtmlOnline(t) {
         id: cleanOnlineTxt(i.id || "1", 60), name: cleanOnlineTxt(i.name, 120), price: resolveOnlineItemPrice(i),
         type: cleanOnlineTxt(i.type || 'food', 20), qty: Math.min(99, Math.max(1, parseMoney(i.qty) || 1)), notes: (Array.isArray(i.notes) ? i.notes : Object.values(i.notes || {})).map(n => cleanOnlineTxt(n, 60))
       }));
-      ONLINE_PAID_CART = true; document.getElementById('cust-phone').value = cleanOnlineTxt(order.phone || '', 20);
-      document.getElementById('cust-name').value = cleanOnlineTxt(order.name || '', 100);
+      ONLINE_PAID_CART = true; document.getElementById('cust-phone').value = normalizePhoneVN(cleanOnlineTxt(order.phone || '', 20));
+      document.getElementById('cust-name').value = titleCaseName(cleanOnlineTxt(order.name || '', 100));
       document.getElementById('cust-address').value = cleanOnlineTxt(order.address || '', 300);
       document.getElementById('ship-fee').value = parseMoney(order.shipFee);
       setPayMethod('Chuyển khoản (Banking)');   // đơn online đã thu qua chuyển khoản
@@ -6247,7 +6353,13 @@ function escHtmlOnline(t) {
       renderCart();
       if (db) db.ref('branches/' + CURRENT_BRANCH + '/online_orders/' + orderId).update({ status: 'Đang xử lý' });
       closeOnlineOrdersModal();
-      alert("Đã nạp đơn vào giỏ hàng POS!");
+      let _link = '';
+      try {
+        await checkCustomerPhone(true);   // tự khớp SĐT với khách có sẵn để tích điểm
+        const _ph = document.getElementById('cust-phone').value.trim();
+        if (_ph.length >= 9) _link = document.getElementById('reward-suggestion').innerText.indexOf('Khách hàng mới') >= 0 ? '\n🆕 Khách mới (SĐT ' + _ph + '): sẽ tạo hồ sơ và tích điểm khi lưu đơn.' : '\n✅ Đã khớp khách có sẵn (SĐT ' + _ph + '): hiện có ' + currentCustomerPoints + ' điểm, sẽ cộng điểm khi lưu đơn.';
+      } catch (e) { console.warn('link khach', e); }
+      alert("Đã nạp đơn vào giỏ hàng POS!" + _link);
     }
 
     // === QUẢN LÝ MENU TRỰC TIẾP TRÊN GIAO DIỆN & PHÂN QUYỀN ===
