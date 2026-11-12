@@ -1269,8 +1269,8 @@ main { min-height: 0; }
 <div id="b-qr-block" style="display:none; text-align:center; margin-top:4px; padding-top:3px; border-top:1.5px dashed #000;">
   <div style="font-weight:900; font-size:11px;">QUÉT QR ĐỂ CHUYỂN KHOẢN</div>
   <div id="b-qr-amount" style="font-weight:900; font-size:15px; margin:2px 0;"></div>
+  <div style="font-weight:900; font-size:11px; margin-bottom:2px;">BIDV - NGUYEN THI MY NGOC</div>
   <div id="b-qr-svg" style="display:flex; justify-content:center;"></div>
-  <div style="font-weight:900; font-size:11px; margin-top:2px;">NGUYEN THI MY NGOC</div>
 </div>
 <!-- Dòng kết thúc có mực thật + đệm giấy -->
 <div class="bill-end">✿ ✿ ✿</div>
@@ -1541,18 +1541,22 @@ main { min-height: 0; }
     async function auditOrder(branch, action, o, after, changes) {
       try {
         await db.ref('branches/' + branch + '/auditLog').push({
-          at: Date.now(), action, by: CURRENT_USER_NAME || '', byPhone: CURRENT_USER_PHONE || '', orderId: o.id || '', invoice: o.invoice_code || '', orderTime: o.created_at || '',
+          at: Date.now(), branch: branch || '', action, by: CURRENT_USER_NAME || '', byPhone: CURRENT_USER_PHONE || '', orderId: o.id || '', invoice: o.invoice_code || '', orderTime: o.created_at || '',
           before: { total: Number(o.total) || 0, payMethod: o.payMethod || 'Tiền mặt', name: o.name || '', phone: o.phone || '', items: o.items ? eoItemsOf(o).map(i => i.name + ' x' + i.qty).join('; ').slice(0, 400) : '' },
           changes: Array.isArray(changes) ? changes : [],
           after: after ? { total: Number(after.total) || 0, payMethod: after.payMethod || '' } : null
         });
-      } catch (e) { console.warn('audit', e); }
+        return true;
+      } catch (e) { console.warn('audit', e); return false; }
     }
     async function openAuditLog() {
       if (!can('auditView')) return alert("Bạn chưa được cấp quyền xem nhật ký.");
-      const snap = await db.ref('branches/' + CURRENT_BRANCH + '/auditLog').limitToLast(100).once('value'); const rows = [];
-      snap.forEach(c => rows.push(c.val())); rows.sort((a, b) => b.at - a.at);
-      const tr = rows.map(r => '<tr><td>' + shTime(r.at) + '</td><td>' + r.by + '</td><td style="font-weight:bold;color:' + (r.action === 'xóa' ? '#c1121f' : '#e07a00') + ';">' + r.action.toUpperCase() + '</td><td>' + r.invoice + '<br><small>' + r.orderTime + '</small></td><td>' + (r.orderId ? shMoney(r.before.total) : '—') + '<br><small>' + r.before.payMethod + '</small></td><td>' + (r.after ? shMoney(r.after.total) + '<br><small>' + r.after.payMethod + '</small>' : '—') + '</td><td style="text-align:left;font-size:11px;">' + auditDetail(r) + '</td></tr>').join('');
+      const brs = (CURRENT_ROLE === 'BOD' && Array.isArray(branchList) && branchList.length) ? branchList : [CURRENT_BRANCH]; const rows = [];
+      const snaps = await Promise.all(brs.map(b => db.ref('branches/' + b + '/auditLog').limitToLast(100).once('value').catch(() => null)));
+      snaps.forEach((snap, i) => { if (snap) snap.forEach(c => { const v = c.val() || {}; v._br = v.branch || brs[i]; rows.push(v); }); });
+      rows.sort((a, b) => (b.at || 0) - (a.at || 0)); rows.length = Math.min(rows.length, 100);
+      rows.forEach(r => { r.before = r.before || { total: 0, payMethod: '' }; r.action = String(r.action || ''); r.by = r.by || ''; r.invoice = r.invoice || ''; r.orderTime = r.orderTime || ''; });
+      const tr = rows.map(r => '<tr><td>' + shTime(r.at) + '</td><td>' + r.by + '</td><td style="font-weight:bold;color:' + (r.action === 'xóa' ? '#c1121f' : '#e07a00') + ';">' + r.action.toUpperCase() + '</td><td>' + r.invoice + '<br><small>' + r.orderTime + '</small>' + (brs.length > 1 ? '<br><small style="color:#6d597a;">' + escHtmlOnline(r._br) + '</small>' : '') + '</td><td>' + (r.orderId ? shMoney(r.before.total) : '—') + '<br><small>' + r.before.payMethod + '</small></td><td>' + (r.after ? shMoney(r.after.total) + '<br><small>' + r.after.payMethod + '</small>' : '—') + '</td><td style="text-align:left;font-size:11px;">' + auditDetail(r) + '</td></tr>').join('');
       shiftModal('<h3 style="margin:0 0 8px;">🧾 Nhật ký sửa/xóa đơn (100 gần nhất) — ' + CURRENT_BRANCH + '</h3><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px;" border="1" cellpadding="5"><tr style="background:#f1e7e0;"><th>Lúc</th><th>Người làm</th><th>Việc</th><th>Hóa đơn</th><th>Trước khi sửa</th><th>Sau khi sửa</th><th>Chi tiết thay đổi</th></tr>' + (tr || '<tr><td colspan="7">Chưa có</td></tr>') + '</table></div><button style="' + shBtn + 'background:#6c757d;" onclick="closeShiftModal()">Đóng</button>', true);
     }
     // ===== HẾT QUẢN LÝ CA =====
@@ -3606,7 +3610,8 @@ function setHistoryFilterRange(rangeType) {
       changes.unshift('📝 Lý do: ' + _reason.slice(0, 150));
       log[log.length - 1].changes = changes; log[log.length - 1].byPhone = CURRENT_USER_PHONE || '';
       try {
-        await auditOrder(E.branch, 'sửa', prev, updates, changes);
+        const logged = await auditOrder(E.branch, 'sửa', prev, updates, changes);
+        if (!logged) return alert('❌ Không ghi được nhật ký nên CHƯA lưu sửa đơn.\nKiểm tra kết nối mạng và quyền ghi của nhánh "' + E.branch + '" (auditLog) trong Firebase Rules.');
         await db.ref('branches/' + E.branch + '/orders/' + E.key).update(updates);
         // Điểm tích lũy: chỉ chỉnh khi cùng số điện thoại và khách đã có trong danh sách
         const delta = pointsEarned - (Number(prev.pointsEarned) || 0);
@@ -3633,7 +3638,8 @@ function setHistoryFilterRange(rangeType) {
       if (!db) return alert('Chưa kết nối Firebase!');
       const br = branchName || CURRENT_BRANCH;
       try {
-        await auditOrder(br, 'xóa', od, null, ['📝 Lý do: ' + reason.slice(0, 150)]);
+        const logged = await auditOrder(br, 'xóa', od, null, ['📝 Lý do: ' + reason.slice(0, 150)]);
+        if (!logged) return alert('❌ Không ghi được nhật ký nên CHƯA xóa đơn.\nKiểm tra kết nối mạng và quyền ghi của nhánh "' + br + '" (auditLog) trong Firebase Rules.');
         await db.ref('branches/' + br + '/orders/' + orderKey).remove();
         alert('Đã xóa!'); loadHistoryData();
       } catch (e) { alert('Không xóa được: ' + (e && e.message ? e.message : e)); }
@@ -5434,7 +5440,7 @@ function crc16ccitt(str) {
   for (let i = 0; i < str.length; i++) { c ^= str.charCodeAt(i) << 8; for (let j = 0; j < 8; j++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xFFFF : (c << 1) & 0xFFFF; }
   return c.toString(16).toUpperCase().padStart(4, '0');
 }
-const QR_ACCOUNT_NAME = 'NGUYEN THI MY NGOC';
+const QR_ACCOUNT_NAME = 'BIDV - NGUYEN THI MY NGOC';
 function buildVietQRPayload(amount) {
   const tlv = (tag, val) => tag + String(val.length).padStart(2, '0') + val;
   const acc = tlv('00', 'A000000727') + tlv('01', tlv('00', TRANSFER_QR.bin) + tlv('01', TRANSFER_QR.account)) + tlv('02', 'QRIBFTTA');
@@ -5492,13 +5498,13 @@ async function printTransferQR() {
     if (ready) {
       try {
         const L = []; wrapPlain(shop, BT_LINE_CHARS).forEach(l => L.push(btCenter(l)));
-        L.push(btCenter('QR CHUYỂN KHOẢN')); L.push(btCenter('Số tiền: ' + moneyTxt)); L.push({ qr: payload }); L.push(btCenter(QR_ACCOUNT_NAME));
+        L.push(btCenter('QR CHUYỂN KHOẢN')); L.push(btCenter('Số tiền: ' + moneyTxt)); L.push(btCenter(QR_ACCOUNT_NAME)); L.push({ qr: payload });
         L.push(btCenter('Mở app ngân hàng,')); L.push(btCenter('quét mã để thanh toán'));
         await btPrintLines(L, btPrintMode); return;
       } catch (e) { console.error('Lỗi in QR Bluetooth:', e); bluetoothServer = null; printerCharacteristic = null; }
     } else setPrinterStatus('🖨️ Kết nối máy in', false);
   }
-  document.getElementById('qr-print').innerHTML = '<div style="font-size:14px;font-weight:900;">' + escHtmlOnline(shop) + '</div><div style="font-size:12px;font-weight:900;">QR CHUYỂN KHOẢN</div><div style="font-size:18px;font-weight:900;margin:3px 0;">' + escHtmlOnline(moneyTxt) + '</div><div style="display:flex;justify-content:center;">' + qrSvgHtml(payload) + '</div><div style="font-size:12px;font-weight:900;margin-top:3px;">' + QR_ACCOUNT_NAME + '</div><div style="font-size:10px;margin-top:3px;">Mở app ngân hàng, quét mã để thanh toán</div><div style="height:22mm;"></div>';
+  document.getElementById('qr-print').innerHTML = '<div style="font-size:14px;font-weight:900;">' + escHtmlOnline(shop) + '</div><div style="font-size:12px;font-weight:900;">QR CHUYỂN KHOẢN</div><div style="font-size:18px;font-weight:900;margin:3px 0;">' + escHtmlOnline(moneyTxt) + '</div><div style="font-size:12px;font-weight:900;margin-bottom:3px;">' + QR_ACCOUNT_NAME + '</div><div style="display:flex;justify-content:center;">' + qrSvgHtml(payload) + '</div><div style="font-size:10px;margin-top:3px;">Mở app ngân hàng, quét mã để thanh toán</div><div style="height:22mm;"></div>';
   document.body.classList.add('print-qr');
   try { window.print(); } finally { await sleep(800); document.body.classList.remove('print-qr'); }
 }
@@ -5558,7 +5564,7 @@ function buildCustomerLines(o, branchName) {
   L.push(btDash);
   wrapPlain(cfg.footerText || '- 50Đ ĐỔI BÁNH TRÁNG | 100Đ GIẢM 5% VIP -', W).forEach(l => L.push(btCenter(l)));
   wrapPlain(cfg.thankText || 'Cảm ơn quý khách & Hẹn gặp lại!', W).forEach(l => L.push(btCenter(l)));
-  if (needsTransferQR(o)) { try { const qp = buildVietQRPayload(o.total); qrModel(qp); L.push(btDash); L.push(btCenter('QUÉT QR ĐỂ CHUYỂN KHOẢN')); L.push(btCenter(money(o.total) + 'đ')); L.push({ qr: qp }); L.push(btCenter(QR_ACCOUNT_NAME)); } catch (e) { console.warn('Bỏ qua QR:', e.message); } }
+  if (needsTransferQR(o)) { try { const qp = buildVietQRPayload(o.total); qrModel(qp); L.push(btDash); L.push(btCenter('QUÉT QR ĐỂ CHUYỂN KHOẢN')); L.push(btCenter(money(o.total) + 'đ')); L.push(btCenter(QR_ACCOUNT_NAME)); L.push({ qr: qp }); } catch (e) { console.warn('Bỏ qua QR:', e.message); } }
   return L;
 }
 
