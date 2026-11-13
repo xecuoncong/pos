@@ -5992,6 +5992,12 @@ function escHtmlOnline(t) {
       if (Array.isArray(o.items)) return o.items.filter(Boolean);
       return typeof o.items === 'object' ? Object.values(o.items).filter(Boolean) : [];
     }
+    // Quà tặng đơn từ 200K: app order lưu ở mục riêng "gifts", ví dụ ["Quà 200k: Trà tắc tươi"]
+    function onlineGiftsOf(o) {
+      if (!o || !o.gifts) return [];
+      const arr = Array.isArray(o.gifts) ? o.gifts : (typeof o.gifts === 'object' ? Object.values(o.gifts) : [o.gifts]);
+      return arr.filter(Boolean).slice(0, 1).map(g => { const t = cleanOnlineTxt(String(g), 120), k = t.indexOf(':'); return (k >= 0 ? t.slice(k + 1) : t).trim(); }).filter(Boolean);
+    }
     // Món trong đơn khách đặt thiếu giá -> tra giá từ menu (theo id, rồi theo tên)
     function findMenuPrice(i) {
       const menu = Object.values(liveMenuObject || {}).filter(m => m && typeof m === 'object');
@@ -6067,7 +6073,7 @@ function escHtmlOnline(t) {
       } catch (e) { alert('Lỗi xác nhận: ' + e.message); }
     }
     function onlineItemsHtml(o) {
-      return onlineItemsOf(o).map(i => escHtmlOnline(i.name) + (parseMoney(i.qty) > 1 ? ' x' + parseMoney(i.qty) : '')).join(', ');
+      return onlineItemsOf(o).map(i => escHtmlOnline(i.name) + (parseMoney(i.qty) > 1 ? ' x' + parseMoney(i.qty) : '')).join(', ') + (onlineGiftsOf(o).length ? ' · 🎁 Tặng: ' + escHtmlOnline(onlineGiftsOf(o).join(', ')) : '');
     }
 
     function startListeningForOnlineOrders() {
@@ -6344,6 +6350,12 @@ function escHtmlOnline(t) {
         id: cleanOnlineTxt(i.id || "1", 60), name: cleanOnlineTxt(i.name, 120), price: resolveOnlineItemPrice(i),
         type: cleanOnlineTxt(i.type || 'food', 20), qty: Math.min(99, Math.max(1, parseMoney(i.qty) || 1)), notes: (Array.isArray(i.notes) ? i.notes : Object.values(i.notes || {})).map(n => cleanOnlineTxt(n, 60))
       }));
+      let _giftTxt = '';
+      {
+        const gross = cart.reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.qty) || 0), 0), gifts = onlineGiftsOf(order);
+        if (gifts.length && gross >= 200000) gifts.forEach(g => { cart.push({ id: "9998", name: g + ' [TẶNG 200K]', price: 0, type: 'drink', qty: 1, notes: [] }); _giftTxt += '\n🎁 Đã thêm ly tặng: ' + g + ' (0đ)'; });
+        else if (gifts.length) _giftTxt = '\n⚠️ Đơn có ghi quà tặng nhưng tổng món chưa đủ 200K nên KHÔNG thêm ly tặng.';
+      }
       ONLINE_PAID_CART = true; document.getElementById('cust-phone').value = normalizePhoneVN(cleanOnlineTxt(order.phone || '', 20));
       document.getElementById('cust-name').value = titleCaseName(cleanOnlineTxt(order.name || '', 100));
       document.getElementById('cust-address').value = cleanOnlineTxt(order.address || '', 300);
@@ -6359,7 +6371,7 @@ function escHtmlOnline(t) {
         const _ph = document.getElementById('cust-phone').value.trim();
         if (_ph.length >= 9) _link = document.getElementById('reward-suggestion').innerText.indexOf('Khách hàng mới') >= 0 ? '\n🆕 Khách mới (SĐT ' + _ph + '): sẽ tạo hồ sơ và tích điểm khi lưu đơn.' : '\n✅ Đã khớp khách có sẵn (SĐT ' + _ph + '): hiện có ' + currentCustomerPoints + ' điểm, sẽ cộng điểm khi lưu đơn.';
       } catch (e) { console.warn('link khach', e); }
-      alert("Đã nạp đơn vào giỏ hàng POS!" + _link);
+      alert("Đã nạp đơn vào giỏ hàng POS!" + _giftTxt + _link);
     }
 
     // === QUẢN LÝ MENU TRỰC TIẾP TRÊN GIAO DIỆN & PHÂN QUYỀN ===
