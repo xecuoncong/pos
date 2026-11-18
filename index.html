@@ -243,18 +243,21 @@
 /* Tem: bố cục gọn kiểu tem trà sữa. Chữ tính theo chiều cao tem và tự co (--k) cho vừa khổ; có chữ nhỏ nhất để không bị mờ */
 #label-print .lbl { width: var(--lw); height: var(--lh); box-sizing: border-box; padding: 1.2mm 1.8mm; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; gap: 0.3mm;
   page-break-after: always; break-after: page; background: #fff; color: #000; --k: 1;
-  font-family: Arial, 'Segoe UI', sans-serif; font-weight: 700; line-height: 1.12; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  font-family: var(--lfont, Arial, 'Segoe UI', sans-serif); font-weight: 700; line-height: 1.12; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 #label-print .lbl > * { flex-shrink: 0; }
 #label-print .lbl:last-child { page-break-after: auto; break-after: auto; }
-#label-print .l-top { display: flex; justify-content: space-between; align-items: baseline; gap: 1mm; white-space: nowrap; font-weight: 900; font-size: max(2.3mm, calc(var(--lh) * 0.10 * var(--k))); border-bottom: 0.25mm solid #000; padding-bottom: 0.4mm; }
+#label-print .l-top { display: flex; justify-content: space-between; align-items: baseline; gap: 1mm; white-space: nowrap; font-weight: var(--wbold, 900); font-size: max(2.3mm, calc(var(--lh) * 0.10 * var(--k))); border-bottom: 0.25mm solid #000; padding-bottom: 0.4mm; }
 #label-print .l-cust { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: max(2.2mm, calc(var(--lh) * 0.095 * var(--k))); }
 #label-print .l-main { display: flex; align-items: flex-start; gap: 1mm; }
-#label-print .l-name { flex: 1; min-width: 0; font-weight: 900; font-size: max(3.2mm, calc(var(--lh) * 0.15 * var(--k))); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
-#label-print .l-n { white-space: nowrap; font-weight: 900; font-size: max(2.6mm, calc(var(--lh) * 0.115 * var(--k))); }
+#label-print .l-name { flex: 1; min-width: 0; text-align: var(--nalign, left); font-weight: var(--wbold, 900); font-size: max(3.2mm, calc(var(--lh) * 0.15 * var(--k))); display: -webkit-box; -webkit-line-clamp: var(--nlines, 2); -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+#label-print .l-n { white-space: nowrap; font-weight: var(--wbold, 900); font-size: max(2.6mm, calc(var(--lh) * 0.115 * var(--k))); }
 #label-print .l-note { font-size: max(2.2mm, calc(var(--lh) * 0.10 * var(--k))); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 #label-print .l-foot { margin-top: auto; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 0.2mm solid #000; padding-top: 0.3mm; font-size: max(2mm, calc(var(--lh) * 0.085 * var(--k))); }
 #label-print .lbl.no-foot .l-foot, #label-print .lbl.no-cust .l-cust { display: none; }
 #label-print .lbl.note-1 .l-note { -webkit-line-clamp: 1; }
+#label-print.no-rules .l-top { border-bottom: none; padding-bottom: 0; }
+#label-print.no-rules .l-foot { border-top: none; padding-top: 0; }
+#label-print.lc-stroke .l-top, #label-print.lc-stroke .l-name, #label-print.lc-stroke .l-n { -webkit-text-stroke: 0.14mm #000; }
 @media print {
   /* Khi in tem: bỏ hẳn phần còn lại của trang, nếu không mỗi tem kéo theo hàng chục tờ trắng */
   body.print-label > *:not(#label-print) { display: none !important; }
@@ -1029,6 +1032,34 @@ main { min-height: 0; }
           <button type="button" class="btn-print" style="margin:0; flex:1; background:#555;" onclick="diagLabelPrinter()">🔍 Xem cổng BLE</button>
         </div>
         <div class="ps-hint" id="label-bt-status">Máy in tem: chưa kết nối.</div>
+        <details style="margin-top:6px;">
+          <summary style="cursor:pointer; font-weight:bold;">⚙️ Tinh chỉnh in tem Bluetooth / USB</summary>
+          <label style="display:block; margin-top:6px;">Lề an toàn hai bên (mm), tăng lên nếu chữ sát mép bị cụt:</label>
+          <input type="number" id="ps-label-padx" min="0" max="8" step="0.5" style="width:80px;">
+          <label style="display:block; margin-top:6px;"><input type="checkbox" id="ps-label-rotate"> Xoay 180° (bật nếu tem in ra bị ngược)</label>
+        </details>
+        <details style="margin-top:6px;">
+          <summary style="cursor:pointer; font-weight:bold;">🎨 Bố cục & chữ trên tem</summary>
+          <div style="font-weight:bold; margin-top:6px;">Hiện trên tem:</div>
+          <label style="display:block;"><input type="checkbox" id="ps-lc-num"> Số thứ tự đơn (#12)</label>
+          <label style="display:block;"><input type="checkbox" id="ps-lc-time"> Ngày giờ</label>
+          <label style="display:block;"><input type="checkbox" id="ps-lc-cust"> Tên khách</label>
+          <label style="display:block;"><input type="checkbox" id="ps-lc-count"> Số thứ tự ly (1/2)</label>
+          <label style="display:block;"><input type="checkbox" id="ps-lc-note"> Ghi chú món</label>
+          <label style="display:block;"><input type="checkbox" id="ps-lc-rules"> Đường kẻ ngang</label>
+          <div class="ps-hint" style="margin-top:0;">Tên món luôn hiện. Dòng chữ cuối tem chỉnh ở ô phía trên (để trống = ẩn).</div>
+          <label style="display:block; margin-top:6px;">Cỡ chữ tên món:</label>
+          <select id="ps-lc-size" style="width:100%;"><option value="l">Lớn (to nhất có thể)</option><option value="auto">Tự động (khuyên dùng)</option><option value="m">Vừa</option><option value="s">Nhỏ (chứa được nhiều chữ)</option></select>
+          <label style="display:block; margin-top:6px;">Nét chữ:</label>
+          <select id="ps-lc-bold" style="width:100%;"><option value="0">Thường</option><option value="1">Đậm</option><option value="2">Rất đậm</option></select>
+          <label style="display:block; margin-top:6px;">Tên món tối đa:</label>
+          <select id="ps-lc-lines" style="width:100%;"><option value="1">1 dòng</option><option value="2">2 dòng</option><option value="3">3 dòng</option></select>
+          <label style="display:block; margin-top:6px;">Căn tên món:</label>
+          <select id="ps-lc-align" style="width:100%;"><option value="left">Trái</option><option value="center">Giữa</option></select>
+          <label style="display:block; margin-top:6px;">Font chữ (chỉ khi in qua hộp thoại / máy tính):</label>
+          <select id="ps-lc-font" style="width:100%;"><option value="arial">Arial</option><option value="tahoma">Tahoma</option><option value="times">Times New Roman</option><option value="courier">Courier New</option></select>
+          <div class="ps-hint">In trực tiếp Bluetooth/USB: máy in dùng font có sẵn, không dấu, nên cỡ chữ, nét chữ, bố cục chỉnh được còn font chữ thì không. Chữ tự co nhỏ lại khi thiếu chỗ.</div>
+        </details>
         <div class="ps-hint">Tem in bằng hộp thoại in bình thường (nhanh): app đặt đúng khổ trang theo khổ tem, mỗi ly/hộp 1 tem. Chọn máy in tem trong hộp thoại, hoặc đặt máy in tem làm máy in mặc định để in thẳng không hỏi. Đổi khổ tem ở đây là tự áp dụng, không cần sửa code.</div>
       </div>
 
@@ -5861,6 +5892,27 @@ try {
   if (sz) { labelW = +sz[1]; labelH = +sz[2]; }
 } catch (e) {}
 let labelFoot = 'CUỐN+';
+// Bố cục & chữ trên tem (lưu theo từng thiết bị)
+const LABEL_CFG_DEFAULT = { showNum: true, showTime: true, showCust: true, showCount: true, showNote: true, showRules: true, size: 'auto', bold: 1, nameLines: 2, nameAlign: 'left', font: 'arial' };
+let LABEL_CFG = Object.assign({}, LABEL_CFG_DEFAULT);
+try { const _c = JSON.parse(localStorage.getItem('cuon_label_cfg') || 'null'); if (_c && typeof _c === 'object') LABEL_CFG = Object.assign({}, LABEL_CFG_DEFAULT, _c); } catch (e) {}
+const LABEL_FONTS = { arial: "Arial, 'Segoe UI', Roboto, sans-serif", tahoma: "Tahoma, 'Segoe UI', Roboto, sans-serif", times: "'Times New Roman', Times, serif", courier: "'Courier New', monospace" };
+function labelCfgToForm() {
+  const C = LABEL_CFG, $ = id => document.getElementById(id);
+  $('ps-lc-num').checked = !!C.showNum; $('ps-lc-time').checked = !!C.showTime; $('ps-lc-cust').checked = !!C.showCust;
+  $('ps-lc-count').checked = !!C.showCount; $('ps-lc-note').checked = !!C.showNote; $('ps-lc-rules').checked = !!C.showRules;
+  $('ps-lc-size').value = C.size; $('ps-lc-bold').value = String(C.bold); $('ps-lc-lines').value = String(C.nameLines); $('ps-lc-align').value = C.nameAlign; $('ps-lc-font').value = C.font;
+}
+function labelCfgFromForm() {
+  const $ = id => document.getElementById(id), pick = (v, list, d) => list.includes(v) ? v : d;
+  LABEL_CFG = {
+    showNum: $('ps-lc-num').checked, showTime: $('ps-lc-time').checked, showCust: $('ps-lc-cust').checked,
+    showCount: $('ps-lc-count').checked, showNote: $('ps-lc-note').checked, showRules: $('ps-lc-rules').checked,
+    size: pick($('ps-lc-size').value, ['l', 'auto', 'm', 's'], 'auto'), bold: Math.min(2, Math.max(0, parseInt($('ps-lc-bold').value) || 0)),
+    nameLines: Math.min(3, Math.max(1, parseInt($('ps-lc-lines').value) || 2)), nameAlign: pick($('ps-lc-align').value, ['left', 'center'], 'left'), font: pick($('ps-lc-font').value, Object.keys(LABEL_FONTS), 'arial')
+  };
+  try { localStorage.setItem('cuon_label_cfg', JSON.stringify(LABEL_CFG)); } catch (e) {}
+}
 try { const _lf = localStorage.getItem('cuon_label_foot'); if (_lf !== null) labelFoot = _lf; } catch (e) {}
 function refreshLabelUI() {
   const c = document.getElementById('label-toggle'), t = document.getElementById('label-size-text');
@@ -5885,6 +5937,7 @@ function openPrintSettings() {
   document.getElementById('ps-lw').value = labelW; document.getElementById('ps-lh').value = labelH;
   document.getElementById('ps-label-foot').value = labelFoot;
   document.getElementById('ps-label-mode').value = LABEL_MODE; setLabelStatus();
+  document.getElementById('ps-label-padx').value = LABEL_PAD_X_MM; document.getElementById('ps-label-rotate').checked = LABEL_ROTATE; labelCfgToForm();
   const key = labelW + 'x' + labelH, sel = document.getElementById('ps-label-preset');
   sel.value = Array.from(sel.options).some(o => o.value === key) ? key : 'custom';
   document.getElementById('print-settings-modal').style.display = 'flex';
@@ -5897,6 +5950,12 @@ function applyPrintSettingsFromForm() {
   labelW = Math.round(w); labelH = Math.round(h);
   labelFoot = document.getElementById('ps-label-foot').value.trim().slice(0, 40);
   try { const _v = document.getElementById('ps-label-mode').value; LABEL_MODE = (_v === 'bt' || _v === 'usb') ? _v : 'dialog'; localStorage.setItem('cuon_label_mode', LABEL_MODE); } catch (e) {}
+  try {
+    const _px = parseFloat(document.getElementById('ps-label-padx').value); LABEL_PAD_X_MM = (_px >= 0 && _px <= 8) ? _px : 3;
+    LABEL_ROTATE = document.getElementById('ps-label-rotate').checked;
+    localStorage.setItem('cuon_label_padx', String(LABEL_PAD_X_MM)); localStorage.setItem('cuon_label_rotate', LABEL_ROTATE ? '1' : '0');
+  } catch (e) {}
+  labelCfgFromForm();
   try { localStorage.setItem('cuon_paper_w', String(PAPER_MM)); localStorage.setItem('cuon_label_size', labelW + 'x' + labelH); localStorage.setItem('cuon_label_foot', labelFoot); } catch (e) {}
   applyPaperWidth(); refreshLabelUI();
   return true;
@@ -5936,9 +5995,14 @@ function labelFits(l, strict) {
   }
   return true;
 }
+// Thang cỡ chữ thử lần lượt (lớn -> nhỏ) theo lựa chọn "Cỡ chữ tên món"
+function labelKs() {
+  const z = LABEL_CFG.size;
+  return z === 'l' ? [1.25, 1.15, 1.05, 1, 0.92, 0.84, 0.76, 0.68, 0.6] : z === 'm' ? [0.88, 0.8, 0.72, 0.64, 0.6] : z === 's' ? [0.74, 0.68, 0.62, 0.6] : [1, 0.92, 0.84, 0.76, 0.68, 0.6];
+}
 // Co chữ dần cho vừa tem; vẫn thiếu chỗ thì bỏ dòng chữ cuối, rồi tên khách, rồi rút ghi chú còn 1 dòng
 function fitLabel(l) {
-  const ks = [1, 0.92, 0.84, 0.76, 0.68, 0.6];
+  const ks = labelKs();
   const tryK = strict => { for (const k of ks) { l.style.setProperty('--k', k); if (labelFits(l, strict)) return true; } return false; };
   if (tryK(true)) return;
   l.classList.add('no-foot'); if (tryK(true)) return;
@@ -5946,7 +6010,7 @@ function fitLabel(l) {
   l.classList.add('note-1'); tryK(false);
 }
 function prepareLabelHTML(o, branchName) {
-  const box = document.getElementById('label-print');
+  const box = document.getElementById('label-print'), C = LABEL_CFG;
   const total = kitchenTotalQty(o);
   const dt = labelDateTime(o);
   const cust = (o.name && o.name !== 'Khách Lẻ') ? o.name : '';
@@ -5955,17 +6019,24 @@ function prepareLabelHTML(o, branchName) {
     const notes = (i.notes && i.notes.length) ? i.notes.join(', ') : '';
     for (let k = 0; k < (Number(i.qty) || 0); k++) {
       n++;
+      const topParts = (C.showNum ? '<span>#' + kEsc(o.order_number) + '</span>' : (C.showTime ? '<span></span>' : '')) + (C.showTime ? '<span>' + kEsc(dt) + '</span>' : '');
       html += `<div class="lbl">
-        <div class="l-top"><span>#${kEsc(o.order_number)}</span><span>${kEsc(dt)}</span></div>
-        ${cust ? `<div class="l-cust">${kEsc(cust)}</div>` : ''}
-        <div class="l-main"><div class="l-name">${kEsc(i.name)}</div><div class="l-n">${n}/${total}</div></div>
-        ${notes ? `<div class="l-note">» ${kEsc(notes)}</div>` : ''}
+        ${topParts ? `<div class="l-top">${topParts}</div>` : ''}
+        ${cust && C.showCust ? `<div class="l-cust">${kEsc(cust)}</div>` : ''}
+        <div class="l-main"><div class="l-name">${kEsc(i.name)}</div>${C.showCount ? `<div class="l-n">${n}/${total}</div>` : ''}</div>
+        ${notes && C.showNote ? `<div class="l-note">» ${kEsc(notes)}</div>` : ''}
         ${labelFoot ? `<div class="l-foot">${kEsc(labelFoot)}</div>` : ''}
       </div>`;
     }
   });
   box.style.setProperty('--lw', labelW + 'mm');
   box.style.setProperty('--lh', labelH + 'mm');
+  box.style.setProperty('--lfont', LABEL_FONTS[C.font] || LABEL_FONTS.arial);
+  box.style.setProperty('--nlines', String(C.nameLines));
+  box.style.setProperty('--nalign', C.nameAlign);
+  box.style.setProperty('--wbold', C.bold === 0 ? '700' : '900');
+  box.classList.toggle('lc-stroke', C.bold >= 2);
+  box.classList.toggle('no-rules', !C.showRules);
   box.innerHTML = html;
   // đo độ vừa khổ ngoài màn hình (ẩn) rồi mới in
   const tmp = { display: 'block', position: 'absolute', left: '-10000px', top: '0', visibility: 'hidden' };
@@ -5996,6 +6067,12 @@ const LABEL_OPT_SERVICES = (() => {
   return a;
 })();
 
+// Thiết lập in tem trực tiếp (lưu theo từng thiết bị)
+let LABEL_PAD_X_MM = 3, LABEL_ROTATE = false;
+try {
+  const _p = parseFloat(localStorage.getItem('cuon_label_padx')); if (_p >= 0 && _p <= 8) LABEL_PAD_X_MM = _p;
+  LABEL_ROTATE = localStorage.getItem('cuon_label_rotate') === '1';
+} catch (e) {}
 let labelDevice = null, labelChar = null, labelDiag = '';
 function setLabelStatus(t) {
   const el = document.getElementById('label-bt-status'); if (!el) return;
@@ -6117,43 +6194,54 @@ function labelMm(mm) { return Math.round(mm * LABEL_DPI / 25.4); }
 // Font có sẵn trong máy in TSPL: [rộng, cao] tính bằng chấm (203dpi)
 const LABEL_FONT = { '1': [8, 12], '2': [12, 20], '3': [16, 24], '4': [24, 32] };
 function labelTextCmd(sp) {
+  const C = LABEL_CFG;
   const dpmm = LABEL_DPI / 25.4, W = Math.round(labelW * dpmm), H = Math.round(labelH * dpmm);
-  const pad = Math.round(1.5 * dpmm), inner = W - pad * 2;
+  const padX = Math.round(LABEL_PAD_X_MM * dpmm), padY = Math.round(1.5 * dpmm), inner = W - padX * 2;
   const q = x => stripVN(x).replace(/"/g, "'");
-  const top1 = q(sp.top1), top2 = q(sp.top2), cust = q(sp.cust), name = q(sp.name), note = q(sp.note), foot = q(sp.foot);
-  const nTxt = sp.n + '/' + sp.total;
-  const levels = [['3', '2'], ['2', '2'], ['2', '1'], ['1', '1']];                 // [font tên món, font chữ phụ]
+  const top1 = C.showNum ? q(sp.top1) : '', top2 = C.showTime ? q(sp.top2) : '', cust = C.showCust ? q(sp.cust) : '', name = q(sp.name), note = C.showNote ? q(sp.note) : '', foot = q(sp.foot);
+  const nTxt = C.showCount ? sp.n + '/' + sp.total : '';
+  // [font tên món, font chữ phụ]: bắt đầu từ cỡ theo lựa chọn, không vừa thì nhỏ dần
+  const levelsAll = [['5', '2'], ['4', '2'], ['3', '2'], ['2', '2'], ['2', '1'], ['1', '1']];
+  const levels = levelsAll.slice({ l: 0, auto: 1, m: 2, s: 4 }[C.size] ?? 1);
   const flagsList = [{}, { nofoot: 1 }, { nofoot: 1, nocust: 1 }, { nofoot: 1, nocust: 1, note1: 1 }];
+  const extra = C.bold >= 2 ? [1, 2] : C.bold === 1 ? [1] : [];       // nét đậm = in chồng lệch 1-2 chấm
   const build = (lv, fl) => {
     const cn = LABEL_FONT[lv[0]], cs = LABEL_FONT[lv[1]], fn = lv[0], fs = lv[1];
-    const cmds = []; let y = pad, ok = true;
-    const text = (x, yy, f, t) => cmds.push('TEXT ' + Math.max(0, Math.round(x)) + ',' + Math.round(yy) + ',"' + f + '",0,1,1,"' + t + '"');
-    text(pad, y, fs, top1); text(W - pad - top2.length * cs[0], y, fs, top2);
-    if ((top1.length + top2.length + 1) * cs[0] > inner) ok = false;
-    y += cs[1] + 2; cmds.push('BAR ' + pad + ',' + y + ',' + inner + ',2'); y += 5;
-    if (!fl.nocust && cust) { text(pad, y, fs, cust.slice(0, Math.floor(inner / cs[0]))); y += cs[1] + 2; }
-    const nw = nTxt.length * cs[0] + 8;
-    let nl = wrapPlain(name, Math.max(1, Math.floor((inner - nw) / cn[0])));
-    if (nl.length > 2) { nl = nl.slice(0, 2); ok = false; }
-    nl.forEach((l, i) => text(pad, y + i * (cn[1] + 2), fn, l));
-    text(W - pad - nTxt.length * cs[0], y, fs, nTxt);
+    const cmds = []; let y = padY, ok = true;
+    const text = (x, yy, f, t, bold) => {
+      const X = Math.max(0, Math.round(x)), Y = Math.round(yy), one = dx => cmds.push('TEXT ' + (X + dx) + ',' + Y + ',"' + f + '",0,1,1,"' + t + '"');
+      one(0); if (bold) extra.forEach(one);
+    };
+    const bar = (yy) => { if (C.showRules) cmds.push('BAR ' + padX + ',' + yy + ',' + inner + ',2'); };
+    if (top1 || top2) {
+      if (top1) text(padX, y, fs, top1, true);
+      if (top2) text(W - padX - top2.length * cs[0] - 2, y, fs, top2, true);
+      if ((top1.length + top2.length + (top1 && top2 ? 1 : 0)) * cs[0] > inner) ok = false;
+      y += cs[1] + 2; bar(y); y += C.showRules ? 5 : 2;
+    }
+    if (!fl.nocust && cust) { text(padX, y, fs, cust.slice(0, Math.floor(inner / cs[0])), false); y += cs[1] + 2; }
+    const nw = nTxt ? nTxt.length * cs[0] + 8 : 0, availW = inner - nw;
+    let nl = wrapPlain(name, Math.max(1, Math.floor(availW / cn[0])));
+    if (nl.length > C.nameLines) { nl = nl.slice(0, C.nameLines); ok = false; }
+    nl.forEach((l, i) => text(C.nameAlign === 'center' ? padX + Math.max(0, (availW - l.length * cn[0]) / 2) : padX, y + i * (cn[1] + 2), fn, l, true));
+    if (nTxt) text(W - padX - nTxt.length * cs[0] - 2, y, fs, nTxt, true);
     y += nl.length * (cn[1] + 2) + 2;
     if (note) {
       const ml = fl.note1 ? 1 : 2; let ll = wrapPlain('>> ' + note, Math.max(1, Math.floor(inner / cs[0])));
       if (ll.length > ml) { ll = ll.slice(0, ml); if (!fl.note1) ok = false; }
-      ll.forEach((l, i) => text(pad, y + i * (cs[1] + 2), fs, l)); y += ll.length * (cs[1] + 2);
+      ll.forEach((l, i) => text(padX, y + i * (cs[1] + 2), fs, l, false)); y += ll.length * (cs[1] + 2);
     }
-    let limit = H - pad;
+    let limit = H - padY;
     if (!fl.nofoot && foot) {
-      const f = foot.slice(0, Math.floor(inner / cs[0])), fy = H - pad - cs[1];
-      cmds.push('BAR ' + pad + ',' + (fy - 4) + ',' + inner + ',2'); text((W - f.length * cs[0]) / 2, fy, fs, f); limit = fy - 6;
+      const f = foot.slice(0, Math.floor(inner / cs[0])), fy = H - padY - cs[1];
+      bar(fy - 4); text((W - f.length * cs[0]) / 2, fy, fs, f, false); limit = fy - 6;
     }
     if (y > limit) ok = false;
     return { ok, cmds };
   };
   let res = null;
   outer: for (const fl of flagsList) for (const lv of levels) { res = build(lv, fl); if (res.ok) break outer; }
-  const lines = ['SIZE ' + labelW + ' mm,' + labelH + ' mm', 'GAP ' + LABEL_GAP_MM + ' mm,0 mm', 'DIRECTION 1', 'DENSITY ' + LABEL_DENSITY, 'CLS'].concat(res.cmds, ['PRINT 1,1', '']);
+  const lines = ['SIZE ' + labelW + ' mm,' + labelH + ' mm', 'GAP ' + LABEL_GAP_MM + ' mm,0 mm', 'DIRECTION ' + (LABEL_ROTATE ? 1 : 0), 'REFERENCE 0,0', 'DENSITY ' + LABEL_DENSITY, 'CLS'].concat(res.cmds, ['PRINT 1,1', '']);
   return new TextEncoder().encode(lines.join('\r\n'));
 }
 async function labelSend(data) {
