@@ -1022,6 +1022,7 @@ main { min-height: 0; }
         <select id="ps-label-mode" style="width:100%;">
           <option value="dialog">Hộp thoại in (máy tính có driver máy in tem)</option>
           <option value="bt">Bluetooth trực tiếp (CLABEL CT221D, chữ không dấu)</option>
+          <option value="usb">Dây USB trực tiếp (tablet hoặc máy tính, Chrome/Edge)</option>
         </select>
         <div style="display:flex; gap:6px; margin:6px 0 2px;">
           <button type="button" class="btn-print" style="margin:0; flex:1;" onclick="connectLabelPrinter()">🔗 Kết nối máy in tem</button>
@@ -5895,7 +5896,7 @@ function applyPrintSettingsFromForm() {
   PAPER_MM = document.getElementById('ps-paper').value === '80' ? 80 : 58;
   labelW = Math.round(w); labelH = Math.round(h);
   labelFoot = document.getElementById('ps-label-foot').value.trim().slice(0, 40);
-  try { LABEL_MODE = document.getElementById('ps-label-mode').value === 'bt' ? 'bt' : 'dialog'; localStorage.setItem('cuon_label_mode', LABEL_MODE); } catch (e) {}
+  try { const _v = document.getElementById('ps-label-mode').value; LABEL_MODE = (_v === 'bt' || _v === 'usb') ? _v : 'dialog'; localStorage.setItem('cuon_label_mode', LABEL_MODE); } catch (e) {}
   try { localStorage.setItem('cuon_paper_w', String(PAPER_MM)); localStorage.setItem('cuon_label_size', labelW + 'x' + labelH); localStorage.setItem('cuon_label_foot', labelFoot); } catch (e) {}
   applyPaperWidth(); refreshLabelUI();
   return true;
@@ -5978,7 +5979,7 @@ function prepareLabelHTML(o, branchName) {
 // In chữ thường (KHÔNG DẤU, như bill) bằng lệnh TSPL qua Bluetooth LE: nhẹ, nhanh, không vẽ ảnh.
 // Chỉnh các hằng số dưới đây nếu tem lệch / nhạt / chữ nhỏ hơn thực tế.
 let LABEL_MODE = 'dialog';
-try { if (localStorage.getItem('cuon_label_mode') === 'bt') LABEL_MODE = 'bt'; } catch (e) {}
+try { const _lm = localStorage.getItem('cuon_label_mode'); if (_lm === 'bt' || _lm === 'usb') LABEL_MODE = _lm; } catch (e) {}
 const LABEL_DPI = 203;            // độ phân giải đầu in (203 phổ biến; nếu tem nhỏ hơn thực tế thử 300)
 const LABEL_GAP_MM = 2;           // khoảng hở giữa 2 tem
 const LABEL_DENSITY = 8;          // độ đậm 0-15
@@ -6034,12 +6035,71 @@ async function pickLabelPrinter() {
   const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: LABEL_OPT_SERVICES });
   await openLabelChannel(dev);
 }
+// ----- In tem qua DÂY USB (WebUSB): chạy được trên Chrome/Edge của tablet Android lẫn máy tính -----
+let labelUsb = null, labelUsbEp = 0;
+const LABEL_USB_KEY = 'cuon_label_usb';
+const labelDirect = () => LABEL_MODE === 'bt' || LABEL_MODE === 'usb';
+const usbId = d => d.vendorId.toString(16) + ':' + d.productId.toString(16);
+async function openLabelUsb(dev) {
+  if (!dev.opened) await dev.open();
+  if (!dev.configuration) await dev.selectConfiguration(1);
+  if (!window._lblUsbBound && navigator.usb) {
+    navigator.usb.addEventListener('disconnect', e => { if (e.device === labelUsb) { labelUsb = null; setLabelStatus('Máy in tem: đã rút dây USB.'); } });
+    window._lblUsbBound = true;
+  }
+  const diag = ['USB ' + usbId(dev) + ' ' + (dev.productName || '')]; let found = null;
+  for (const itf of dev.configuration.interfaces) for (const alt of itf.alternates) {
+    diag.push('interface ' + itf.interfaceNumber + ' alt ' + alt.alternateSetting + ' class ' + alt.interfaceClass);
+    for (const ep of alt.endpoints) {
+      diag.push('  endpoint ' + ep.endpointNumber + ' ' + ep.direction + ' ' + ep.type);
+      if (!found && ep.direction === 'out' && ep.type === 'bulk') found = { itf, alt, ep };
+    }
+  }
+  labelDiag = diag.join('\n'); console.log('Máy in tem USB:\n' + labelDiag);
+  if (!found) { try { await dev.close(); } catch (e) {} throw new Error('Máy in không có cổng USB nhận dữ liệu (bulk OUT). Thông tin máy:\n' + labelDiag); }
+  try {
+    await dev.claimInterface(found.itf.interfaceNumber);
+    if (found.alt.alternateSetting) await dev.selectAlternateInterface(found.itf.interfaceNumber, found.alt.alternateSetting);
+  } catch (e) {
+    try { await dev.close(); } catch (e2) {}
+    throw new Error('Không chiếm được cổng USB: ' + (e && e.message ? e.message : e) + '\nTrên Windows, driver máy in đang giữ cổng này: máy tính hãy chọn "Hộp thoại in" cho tem; tablet Android thì không bị.');
+  }
+  labelUsb = dev; labelUsbEp = found.ep.endpointNumber;
+  try { localStorage.setItem(LABEL_USB_KEY, usbId(dev)); } catch (e) {}
+  setLabelStatus('Máy in tem: đã nối USB ' + (dev.productName || usbId(dev)));
+}
+async function pickLabelUsb() {
+  if (!navigator.usb) throw new Error('Trình duyệt này không hỗ trợ USB (dùng Chrome/Edge, trang phải chạy https).');
+  const dev = await navigator.usb.requestDevice({ filters: [] });
+  await openLabelUsb(dev);
+}
+async function ensureLabelUsb(allowPicker) {
+  if (labelUsb && labelUsb.opened) return;
+  try {
+    if (navigator.usb) {
+      const id = localStorage.getItem(LABEL_USB_KEY);
+      const dev = id && (await navigator.usb.getDevices()).find(d => usbId(d) === id);
+      if (dev) { await openLabelUsb(dev); return; }
+    }
+  } catch (e) { console.warn('Tự nối máy in tem USB lỗi', e); }
+  if (!allowPicker) throw new Error('Chưa kết nối máy in tem.');
+  await pickLabelUsb();
+}
 async function connectLabelPrinter() {
-  try { await pickLabelPrinter(); alert('✅ Đã kết nối máy in tem: ' + (labelDevice.name || labelDevice.id)); }
-  catch (e) { if (e && e.name === 'NotFoundError') return; console.error(e); setLabelStatus('Máy in tem: chưa kết nối.'); alert('Không kết nối được máy in tem:\n' + (e && e.message ? e.message : e)); }
+  const mode = (document.getElementById('ps-label-mode') || {}).value;
+  try {
+    if (mode === 'usb') { await pickLabelUsb(); alert('✅ Đã kết nối máy in tem qua USB: ' + (labelUsb.productName || usbId(labelUsb))); }
+    else if (mode === 'bt') { await pickLabelPrinter(); alert('✅ Đã kết nối máy in tem: ' + (labelDevice.name || labelDevice.id)); }
+    else alert('Đang chọn "Hộp thoại in": không cần kết nối ở đây. Hãy chọn "Dây USB trực tiếp" hoặc "Bluetooth trực tiếp" rồi bấm lại.');
+  } catch (e) {
+    if (e && e.name === 'NotFoundError') return;
+    console.error(e); setLabelStatus('Máy in tem: chưa kết nối.');
+    alert('Không kết nối được máy in tem:\n' + (e && e.message ? e.message : e));
+  }
 }
 function diagLabelPrinter() { alert(labelDiag ? 'Cổng BLE của máy in tem:\n' + labelDiag : 'Chưa có thông tin. Bấm "Kết nối máy in tem" trước.'); }
 async function ensureLabelPrinter(allowPicker) {
+  if (LABEL_MODE === 'usb') return ensureLabelUsb(allowPicker);
   if (labelChar && labelDevice && labelDevice.gatt.connected) return;
   if (labelDevice) { try { await openLabelChannel(labelDevice); return; } catch (e) { console.warn('Nối lại máy in tem lỗi', e); } }
   try {
@@ -6097,6 +6157,10 @@ function labelTextCmd(sp) {
   return new TextEncoder().encode(lines.join('\r\n'));
 }
 async function labelSend(data) {
+  if (LABEL_MODE === 'usb') {
+    for (let i = 0; i < data.length; i += 4096) { const r = await labelUsb.transferOut(labelUsbEp, data.slice(i, i + 4096)); if (r.status !== 'ok') throw new Error('USB báo lỗi: ' + r.status); }
+    return;
+  }
   const c = labelChar, noResp = c.properties.writeWithoutResponse && !c.properties.write;
   const size = noResp ? Math.min(LABEL_CHUNK, 100) : LABEL_CHUNK;
   for (let i = 0; i < data.length; i += size) {
@@ -6124,12 +6188,12 @@ async function printLabelsBT(o) {
 }
 
 async function printLabels(o, branchName) {
-  if (LABEL_MODE === 'bt') {
+  if (labelDirect()) {
     try { await printLabelsBT(o); return; }
     catch (e) {
       if (e && e.name === 'NotFoundError') return;
-      console.error('Lỗi in tem Bluetooth:', e); labelChar = null;
-      if (!confirm('Không in được tem qua Bluetooth:\n' + (e && e.message ? e.message : e) + '\n\nBấm OK để thử in bằng hộp thoại in, Cancel để bỏ qua.')) return;
+      console.error('Lỗi in tem Bluetooth:', e); labelChar = null; labelUsb = null;
+      if (!confirm('Không in được tem trực tiếp (' + LABEL_MODE.toUpperCase() + '):\n' + (e && e.message ? e.message : e) + '\n\nBấm OK để thử in bằng hộp thoại in, Cancel để bỏ qua.')) return;
     }
   }
 
@@ -6162,14 +6226,14 @@ async function printOrderBills(o, branchName, viaBT, mode) {
   if (PRINT_MODE === 'usb') viaBT = false;
   if (mode === 'label') { await printLabels(o, branchName); return; }
   if (mode === 'kitchen') { await printKitchenBill(o, branchName, viaBT); if (labelEnabled) await printLabels(o, branchName); return; }
-  const wantLabel = labelEnabled || LABEL_MODE === 'bt';
+  const wantLabel = labelEnabled || labelDirect();
   const doBills = async () => {
     prepareBillHTML(o, branchName);
     if (kitchenBillEnabled) await printKitchenBill(o, branchName, viaBT);
     if (viaBT) await printCustomerBill(o, branchName);
     else window.print();
   };
-  if (wantLabel && LABEL_MODE === 'bt') {
+  if (wantLabel && labelDirect()) {
     await Promise.all([doBills(), printLabels(o, branchName).catch(e => console.error('Lỗi in tem:', e))]);
   } else {
     await doBills();
