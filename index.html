@@ -102,6 +102,11 @@
 
     .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index: 9999; padding: 10px; }
     .modal-content { background:#fff6ea; padding:15px; border-radius:10px; width:100%; max-width:850px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); border: 1px solid #e2d4c3; }
+    .modal-x-wrap { position: sticky; top: 0; height: 0; z-index: 30; text-align: right; }
+    .modal-x { position: absolute; right: -6px; top: 2px; width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 2px solid #fff; background: #c1121f; color: #fff; font-size: 17px; font-weight: 900; line-height: 1; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+    .modal-x:hover { background: #e63946; }
+    .has-modal-x-btn { display: none !important; }
+    .modal-x-wrap + * { padding-right: 38px; box-sizing: border-box; }
     .modal-content textarea { width:100%; height:120px; font-family:monospace; margin:8px 0; padding:6px; border: 1px solid #d8c3ae; border-radius: 6px; font-size: 11px; background: #fff; }
     .btn-save { background:#8b1f1f; color:white; border:none; padding:9px; width:100%; font-weight:bold; cursor:pointer; border-radius: 6px; font-size: 12px; }
 
@@ -235,20 +240,27 @@
 .label-opt input { width:17px; height:17px; accent-color:#8b1f1f; }
 .label-opt button { background:#fff; border:1px solid #d8a24a; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:bold; cursor:pointer; color:#6b3b00; }
 #label-print { display: none; }
+/* Tem: bố cục gọn kiểu tem trà sữa. Chữ tính theo chiều cao tem và tự co (--k) cho vừa khổ; có chữ nhỏ nhất để không bị mờ */
+#label-print .lbl { width: var(--lw); height: var(--lh); box-sizing: border-box; padding: 1.2mm 1.8mm; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; gap: 0.3mm;
+  page-break-after: always; break-after: page; background: #fff; color: #000; --k: 1;
+  font-family: Arial, 'Segoe UI', sans-serif; font-weight: 700; line-height: 1.12; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+#label-print .lbl > * { flex-shrink: 0; }
+#label-print .lbl:last-child { page-break-after: auto; break-after: auto; }
+#label-print .l-top { display: flex; justify-content: space-between; align-items: baseline; gap: 1mm; white-space: nowrap; font-weight: 900; font-size: max(2.3mm, calc(var(--lh) * 0.10 * var(--k))); border-bottom: 0.25mm solid #000; padding-bottom: 0.4mm; }
+#label-print .l-cust { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: max(2.2mm, calc(var(--lh) * 0.095 * var(--k))); }
+#label-print .l-main { display: flex; align-items: flex-start; gap: 1mm; }
+#label-print .l-name { flex: 1; min-width: 0; font-weight: 900; font-size: max(3.2mm, calc(var(--lh) * 0.15 * var(--k))); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+#label-print .l-n { white-space: nowrap; font-weight: 900; font-size: max(2.6mm, calc(var(--lh) * 0.115 * var(--k))); }
+#label-print .l-note { font-size: max(2.2mm, calc(var(--lh) * 0.10 * var(--k))); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#label-print .l-foot { margin-top: auto; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 0.2mm solid #000; padding-top: 0.3mm; font-size: max(2mm, calc(var(--lh) * 0.085 * var(--k))); }
+#label-print .lbl.no-foot .l-foot, #label-print .lbl.no-cust .l-cust { display: none; }
+#label-print .lbl.note-1 .l-note { -webkit-line-clamp: 1; }
 @media print {
   /* Khi in tem: bỏ hẳn phần còn lại của trang, nếu không mỗi tem kéo theo hàng chục tờ trắng */
   body.print-label > *:not(#label-print) { display: none !important; }
   body.print-label #bill-print, body.print-label #kitchen-print { display: none !important; }
   body.print-label #label-print, body.print-label #label-print * { visibility: visible; color: #000 !important; }
   body.print-label #label-print { display: block !important; position: absolute; left: 0; top: 0; background: #fff; }
-  #label-print .lbl { width: var(--lw); height: var(--lh); box-sizing: border-box; padding: 1.4mm 2mm; overflow: hidden;
-    display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; break-after: page;
-    font-family: Arial, 'Segoe UI', sans-serif; font-weight: 700; line-height: 1.1; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  #label-print .lbl:last-child { page-break-after: auto; break-after: auto; }
-  #label-print .l-top { display: flex; justify-content: space-between; align-items: baseline; font-size: calc(var(--lh) * 0.15); font-weight: 900; border-bottom: 0.3mm solid #000; padding-bottom: 0.6mm; }
-  #label-print .l-name { font-size: calc(var(--lh) * 0.21); font-weight: 900; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
-  #label-print .l-note { font-size: calc(var(--lh) * 0.125); font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  #label-print .l-foot { display: flex; justify-content: space-between; font-size: calc(var(--lh) * 0.10); font-weight: 700; }
 }
 .app-pick-box { border:1px solid #d8c3ae; border-radius:8px; background:#fff; margin-bottom:8px; }
 .app-pick-search { width:100%; padding:8px 10px; border:none; border-bottom:1px solid #eadfce; border-radius:8px 8px 0 0; font-size:13px; box-sizing:border-box; outline:none; }
@@ -579,6 +591,7 @@ main { min-height: 0; }
       <button type="button" id="btn-print-qr" class="btn-qr-print perm-need-print" onclick="printTransferQR()">🧾 In QR chuyển khoản (đưa khách quét)</button>
       <button class="btn-print perm-need-print" onclick="processOrder(true)">🖨️ IN BILL (Tự động lưu đơn)</button>
       <button class="btn-print perm-need-print" style="background:#e65100; margin-top:6px;" onclick="processOrder('kitchen')">🍳 CHỈ IN BILL BẾP (Tự động lưu đơn)</button>
+      <button class="btn-print perm-need-print" style="background:#00838f; margin-top:6px;" onclick="processOrder('label')">🏷️ CHỈ IN TEM (Tự động lưu đơn)</button>
     </section>
   </main>
 
@@ -683,6 +696,7 @@ main { min-height: 0; }
         <button class="btn-pay" style="margin:0;" onclick="submitAppOrder(false)">💾 LƯU ĐƠN (Không in trên thiết bị này)</button>
         <button class="btn-print" id="btn-submit-app-order" style="margin:0;" onclick="submitAppOrder(true)">🖨️ LƯU & IN BILL TRỰC TIẾP</button>
         <button class="btn-print" style="margin:0; background:#e65100;" onclick="submitAppOrder('kitchen')">🍳 LƯU & CHỈ IN BILL BẾP</button>
+        <button class="btn-print" style="margin:0; background:#00838f;" onclick="submitAppOrder('label')">🏷️ LƯU & CHỈ IN TEM</button>
       </div>
     </div>
   </div>
@@ -1002,6 +1016,18 @@ main { min-height: 0; }
           <input type="number" id="ps-lw" min="20" max="150" style="width:70px;"> x
           <input type="number" id="ps-lh" min="15" max="150" style="width:70px;"> mm
         </div>
+        <label style="margin-top:6px; display:block;">Dòng chữ cuối tem (để trống = không in):</label>
+        <input type="text" id="ps-label-foot" maxlength="40" placeholder="VD: CUỐN+ - Ngon trọn vị" style="width:100%; box-sizing:border-box;">
+        <label style="margin-top:8px; display:block;">Cách in tem:</label>
+        <select id="ps-label-mode" style="width:100%;">
+          <option value="dialog">Hộp thoại in (máy tính có driver máy in tem)</option>
+          <option value="bt">Bluetooth trực tiếp (CLABEL CT221D, chữ không dấu)</option>
+        </select>
+        <div style="display:flex; gap:6px; margin:6px 0 2px;">
+          <button type="button" class="btn-print" style="margin:0; flex:1;" onclick="connectLabelPrinter()">🔗 Kết nối máy in tem</button>
+          <button type="button" class="btn-print" style="margin:0; flex:1; background:#555;" onclick="diagLabelPrinter()">🔍 Xem cổng BLE</button>
+        </div>
+        <div class="ps-hint" id="label-bt-status">Máy in tem: chưa kết nối.</div>
         <div class="ps-hint">Tem in bằng hộp thoại in bình thường (nhanh): app đặt đúng khổ trang theo khổ tem, mỗi ly/hộp 1 tem. Chọn máy in tem trong hộp thoại, hoặc đặt máy in tem làm máy in mặc định để in thẳng không hỏi. Đổi khổ tem ở đây là tự áp dụng, không cần sửa code.</div>
       </div>
 
@@ -1146,8 +1172,29 @@ main { min-height: 0; }
       </div>
       <div class="cust-toolbar">
         <div class="filter-row">
-          <input type="text" id="search-cust-input" placeholder="🔍 Tìm theo SĐT hoặc Tên khách..." style="flex:1;" onkeyup="filterCustomerList()">
-          <button class="btn-export perm-export-cust" onclick="exportCustomersToExcel()">📥 Xuất Excel</button>
+          <input type="text" id="search-cust-input" placeholder="🔍 Nhập tên, SĐT hoặc mã KH để tìm..." style="flex:1; min-width:150px;" oninput="filterCustomerList()">
+          <select id="cust-search-field" onchange="filterCustomerList()" title="Tìm theo">
+            <option value="all">Tìm theo: Tất cả</option>
+            <option value="code">Mã KH</option>
+            <option value="phone">SĐT</option>
+            <option value="name">Tên</option>
+          </select>
+          <select id="cust-filter-type" onchange="filterCustomerList()" title="Lọc nhóm khách">
+            <option value="all">Mọi khách</option>
+            <option value="vip">⭐ Khách VIP</option>
+            <option value="points">Có điểm tích</option>
+          </select>
+          <select id="cust-sort" onchange="filterCustomerList()" title="Sắp xếp">
+            <option value="code-asc">Mã KH: cũ → mới</option>
+            <option value="code-desc">Mã KH: mới → cũ</option>
+            <option value="name">Tên A → Z</option>
+            <option value="points">Điểm cao → thấp</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <span id="cust-count" style="font-size:11px; color:#555; flex:1;"></span>
+          <button class="btn-quick-filter" id="btn-assign-codes" style="display:none;" onclick="assignLegacyCustomerCodes()" title="Đánh mã KH cho khách chưa có mã, theo thứ tự ngày mua đầu tiên">🔢 Cấp mã KH cho khách cũ</button>
+          <button class="btn-export perm-export-cust" onclick="exportCustomersToExcel()">📥 Tải danh sách (Excel)</button>
         </div>
       </div>
       <div id="cust-table-container" style="overflow-x:auto;">Đang tải thông tin...</div>
@@ -1393,6 +1440,7 @@ main { min-height: 0; }
       if (!m) { m = document.createElement('div'); m.id = 'shift-modal'; m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:10px;overflow:auto;'; document.body.appendChild(m); }
       m.innerHTML = '<div style="background:#fff;border-radius:12px;padding:16px;width:100%;max-width:' + (wide ? '980px' : '380px') + ';max-height:94vh;overflow:auto;font-size:13px;">' + html + '</div>';
       m.style.display = 'flex';
+      if (typeof ensureModalX === 'function') ensureModalX(m);
     }
     function closeShiftModal() { const m = document.getElementById('shift-modal'); if (m) m.style.display = 'none'; }
     const shInp = 'width:100%;padding:9px;margin:4px 0 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:15px;box-sizing:border-box;';
@@ -2310,7 +2358,7 @@ main { min-height: 0; }
 
       closeAppModal();
       if (autoPrint) {
-        printOrderBills(orderData, null, false, autoPrint === 'kitchen' ? 'kitchen' : 'all');
+        printOrderBills(orderData, null, false, (autoPrint === 'kitchen' || autoPrint === 'label') ? autoPrint : 'all');
       } else {
         alert(`✅ LƯU ĐƠN SÀN ${currentSelectedApp} THÀNH CÔNG!\n• Mã HD: ${nextData.invoice_code}\n• STT Ngày: #${nextData.order_number}`);
       }
@@ -4107,6 +4155,24 @@ function setHistoryFilterRange(rangeType) {
       document.getElementById('cust-modal').style.display = 'flex';
       loadCustomerData();
     }
+    // ---- Mã khách hàng: KH0001, KH0002... (cấp theo thứ tự trước sau) ----
+    const custCodeFmt = n => 'KH' + String(n).padStart(4, '0');
+    const normViet = t => String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+    // Cấp mã cho khách MỚI. Trả về null nếu còn khách cũ chưa có mã (chờ bấm "Cấp mã KH cho khách cũ" để số thứ tự đúng trước sau).
+    async function allocCustomerCode() {
+      if (!db) return null;
+      let max = 0, legacy = 0;
+      try {
+        const snap = await db.ref('customers').once('value');
+        snap.forEach(c => { const v = c.val() || {}; if (v.code) max = Math.max(max, Number(v.codeNum) || 0); else legacy++; });
+      } catch (e) { return null; }
+      if (legacy > 0) return null;
+      try {
+        const r = await db.ref('customerSeq').transaction(cur => Math.max(Number(cur) || 0, max) + 1);
+        if (r && r.committed) { const n = Number(r.snapshot.val()); return { num: n, code: custCodeFmt(n) }; }
+      } catch (e) { console.warn('customerSeq', e); }
+      return { num: max + 1, code: custCodeFmt(max + 1) };   // dự phòng: không ghi được bộ đếm thì lấy số lớn nhất + 1
+    }
     function loadCustomerData() {
       const container = document.getElementById('cust-table-container');
       if (db) {
@@ -4114,17 +4180,45 @@ function setHistoryFilterRange(rangeType) {
           customerCache = [];
           if (!snapshot.exists()) { container.innerHTML = '<p style="padding:10px;">Chưa có dữ liệu khách hàng nào.</p>'; return; }
           snapshot.forEach(child => { customerCache.push({ phone: child.key, ...(child.val() || {}) }); });
-          renderCustomerTable(customerCache);
+          const bt = document.getElementById('btn-assign-codes');
+          if (bt) bt.style.display = (can('custEdit') && customerCache.some(c => !c.code)) ? '' : 'none';
+          filterCustomerList();
         });
       }
     }
+    // Lọc + sắp xếp theo ô tìm kiếm (không phân biệt hoa thường, gõ không dấu vẫn tìm được "Tài")
+    function getFilteredCustomers() {
+      const q = normViet(document.getElementById('search-cust-input').value.trim());
+      const field = document.getElementById('cust-search-field').value, type = document.getElementById('cust-filter-type').value, sort = document.getElementById('cust-sort').value;
+      let list = customerCache.filter(c => {
+        if (type === 'vip' && !c.vipDiscount) return false;
+        if (type === 'points' && !(Number(c.points) > 0)) return false;
+        if (!q) return true;
+        const code = normViet(c.code || ''), phone = normViet(c.phone), name = normViet(c.name || '');
+        if (field === 'code') return code.includes(q);
+        if (field === 'phone') return phone.includes(q);
+        if (field === 'name') return name.includes(q);
+        return code.includes(q) || phone.includes(q) || name.includes(q);
+      });
+      const byName = (x, y) => String(x.name || '').localeCompare(String(y.name || ''), 'vi');
+      const num = c => (c.code ? (Number(c.codeNum) || 0) : Infinity);
+      if (sort === 'name') list.sort(byName);
+      else if (sort === 'points') list.sort((x, y) => (Number(y.points) || 0) - (Number(x.points) || 0));
+      else if (sort === 'code-desc') list.sort((x, y) => (num(y) === num(x) ? byName(x, y) : (num(y) - num(x)) || 0));
+      else list.sort((x, y) => (num(x) === num(y) ? byName(x, y) : (num(x) - num(y)) || 0));
+      return list;
+    }
     function renderCustomerTable(list) {
       const container = document.getElementById('cust-table-container');
-      let html = '<table class="data-table"><thead><tr><th>SĐT</th><th>Tên Khách</th><th>Địa Chỉ Ship</th><th>Điểm Tích</th><th>Giảm VIP (5%)</th><th>Thao Tác</th></tr></thead><tbody>';
+      const cnt = document.getElementById('cust-count');
+      if (cnt) cnt.innerText = 'Hiển thị ' + list.length + ' / ' + customerCache.length + ' khách';
+      if (!list.length) { container.innerHTML = '<p style="padding:10px;">Không tìm thấy khách nào phù hợp.</p>'; return; }
+      let html = '<table class="data-table"><thead><tr><th>Mã KH</th><th>SĐT</th><th>Tên Khách</th><th>Địa Chỉ Ship</th><th>Điểm Tích</th><th>Giảm VIP (5%)</th><th>Thao Tác</th></tr></thead><tbody>';
       list.forEach(c => {
         const isVip = !!c.vipDiscount;
         html += `
           <tr>
+            <td><strong style="color:#1d3557;">${escHtmlOnline(c.code || '—')}</strong></td>
             <td><strong>${escHtmlOnline(c.phone)}</strong></td>
             <td>${escHtmlOnline(c.name || '')}</td>
             <td><small>${escHtmlOnline(c.address || '')}</small></td>
@@ -4140,9 +4234,40 @@ function setHistoryFilterRange(rangeType) {
       html += '</tbody></table>';
       container.innerHTML = html;
     }
-    function filterCustomerList() {
-      const q = document.getElementById('search-cust-input').value.toLowerCase().trim();
-      renderCustomerTable(customerCache.filter(c => c.phone.includes(q) || (c.name && c.name.toLowerCase().includes(q))));
+    function filterCustomerList() { renderCustomerTable(getFilteredCustomers()); }
+    // Cấp mã cho khách cũ theo thứ tự ngày mua đầu tiên (khách chưa từng có đơn xếp cuối, theo tên)
+    async function assignLegacyCustomerCodes() {
+      if (!can('custEdit')) return alert('⚠️ Bạn chưa được cấp quyền sửa khách hàng.');
+      if (!(await requirePerm('custEdit', 'Cấp mã KH cho khách cũ'))) return;
+      if (!db) return alert('Chưa kết nối Firebase!');
+      const snap = await db.ref('customers').once('value');
+      const all = []; let maxNum = 0;
+      snap.forEach(c => { const v = c.val() || {}; all.push({ phone: c.key, ...v }); if (v.code) maxNum = Math.max(maxNum, Number(v.codeNum) || 0); });
+      const legacy = all.filter(c => !c.code);
+      if (!legacy.length) { alert('Tất cả khách đã có mã KH.'); loadCustomerData(); return; }
+      if (!confirm('Cấp mã KH cho ' + legacy.length + ' khách chưa có mã?\n\nMã được đánh theo thứ tự ngày mua đầu tiên (từ lịch sử đơn của các chi nhánh), bắt đầu từ ' + custCodeFmt(maxNum + 1) + '.\nCó thể mất vài giây. Mã đã cấp sẽ không đổi nữa.')) return;
+      const parseVN = t => { const m = String(t || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/); return m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]).getTime() : 0; };
+      const first = {};
+      for (const br of (Array.isArray(branchList) && branchList.length ? branchList : [CURRENT_BRANCH])) {
+        let os = null;
+        try { os = await db.ref('branches/' + br + '/orders').once('value'); } catch (e) { console.warn('đọc đơn', br, e); }
+        if (!os) continue;
+        os.forEach(o => { const v = o.val() || {}, p = String(v.phone || '').trim(); if (!p) return; const t = Number(v.created_at_timestamp) || parseVN(v.created_at); if (t && (!first[p] || t < first[p])) first[p] = t; });
+      }
+      legacy.sort((x, y) => ((first[x.phone] || Infinity) - (first[y.phone] || Infinity)) || String(x.name || '').localeCompare(String(y.name || ''), 'vi'));
+      let n = maxNum; const ups = [];
+      legacy.forEach(c => { n++; ups.push([c.phone, n, first[c.phone] || 0]); });
+      try {
+        for (let i = 0; i < ups.length; i += 150) {
+          const part = {};
+          ups.slice(i, i + 150).forEach(([ph, num, ts]) => { part['customers/' + ph + '/code'] = custCodeFmt(num); part['customers/' + ph + '/codeNum'] = num; if (ts) part['customers/' + ph + '/createdAt'] = ts; });
+          await db.ref().update(part);
+        }
+      } catch (e) { return alert('❌ Không ghi được mã KH: ' + (e && e.message ? e.message : e)); }
+      try { await db.ref('customerSeq').transaction(cur => Math.max(Number(cur) || 0, n)); } catch (e) { console.warn('customerSeq', e); }
+      auditEvent('cấp mã KH', ['Cấp mã cho ' + legacy.length + ' khách cũ: ' + custCodeFmt(maxNum + 1) + ' → ' + custCodeFmt(n)]);
+      alert('✅ Đã cấp mã KH cho ' + legacy.length + ' khách (' + custCodeFmt(maxNum + 1) + ' → ' + custCodeFmt(n) + ').');
+      loadCustomerData();
     }
     function openEditCustomerModal(phone, name, address, points, vipDiscount) {
       document.getElementById('edit-cust-old-phone').value = phone;
@@ -4186,18 +4311,36 @@ function setHistoryFilterRange(rangeType) {
         auditEvent('chỉnh điểm KH', [newPhone + ': điểm ' + (Number(_old.points) || 0) + ' → ' + _pts + ', VIP ' + (_old.vipDiscount ? 'có' : 'không') + ' → ' + (_vip ? 'có' : 'không')]);
       }
       if (db) {
-        db.ref('customers/' + newPhone).set({
+        const _rec = {
           name: titleCaseName(document.getElementById('edit-cust-name').value),
           address: document.getElementById('edit-cust-address').value.trim(),
           points: parseInt(document.getElementById('edit-cust-points').value) || 0,
           vipDiscount: document.getElementById('edit-cust-vip-discount').checked
-        }).then(() => {
+        };
+        if (_old.code) { _rec.code = _old.code; _rec.codeNum = Number(_old.codeNum) || 0; }   // giữ nguyên mã KH
+        if (_old.createdAt) _rec.createdAt = _old.createdAt;
+        db.ref('customers/' + newPhone).set(_rec).then(() => {
           if (newPhone !== oldPhone) db.ref('customers/' + oldPhone).remove();
           alert("Đã lưu!"); closeEditCustModal(); loadCustomerData();
         });
       }
     }
-    function exportCustomersToExcel() { alert("Đã xuất khách hàng!"); }
+    function exportCustomersToExcel() {
+      if (!can('custExport')) return alert('⚠️ Bạn chưa được cấp quyền tải danh sách khách hàng.');
+      const list = getFilteredCustomers();
+      if (!list.length) return alert('Không có khách nào để tải!');
+      const pad = n => String(n).padStart(2, '0');
+      const fmtD = t => { if (!t) return ''; const d = new Date(Number(t)); return isNaN(d) ? '' : pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); };
+      const lines = [csvRow(['Mã KH', 'SĐT', 'Tên khách', 'Địa chỉ', 'Điểm tích', 'VIP', 'Ngày tạo'])];
+      list.forEach(c => lines.push([csvCell(c.code || ''), '="' + String(c.phone).replace(/[^\d+]/g, '') + '"', csvCell(c.name || ''), csvCell(c.address || ''), csvCell(Number(c.points) || 0), csvCell(c.vipDiscount ? 'VIP' : 'Thường'), csvCell(fmtD(c.createdAt))].join(',')));
+      const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const now = new Date(), link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'Khach_Hang_' + now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + '.csv';
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+      auditEvent('tải DS khách hàng', ['Tải ' + list.length + ' khách (tổng ' + customerCache.length + ')']);
+    }
     function closeCustomerModal() { document.getElementById('cust-modal').style.display = 'none'; }
 
     function openFirebaseModal() { 
@@ -4341,7 +4484,9 @@ async function _reconnectPrinterSilently() {
     if (navigator.bluetooth.getDevices) {        // máy in đã ghép từ lần trước (tùy phiên bản trình duyệt)
       const savedId = localStorage.getItem(PRINTER_ID_KEY);
       const devices = await navigator.bluetooth.getDevices();
-      const dev = devices.find(d => d.id === savedId) || (devices.length === 1 ? devices[0] : null);
+      const labelId = localStorage.getItem('cuon_label_printer_id');
+      const cand = devices.filter(d => d.id !== labelId);
+      const dev = cand.find(d => d.id === savedId) || (cand.length === 1 ? cand[0] : null);
       if (dev) {
         await openPrinterChannel(dev);
         return true;
@@ -5714,6 +5859,8 @@ try {
   const sz = (localStorage.getItem('cuon_label_size') || '').match(/^(\d+)x(\d+)$/);
   if (sz) { labelW = +sz[1]; labelH = +sz[2]; }
 } catch (e) {}
+let labelFoot = 'CUỐN+';
+try { const _lf = localStorage.getItem('cuon_label_foot'); if (_lf !== null) labelFoot = _lf; } catch (e) {}
 function refreshLabelUI() {
   const c = document.getElementById('label-toggle'), t = document.getElementById('label-size-text');
   if (c) c.checked = labelEnabled;
@@ -5735,6 +5882,8 @@ function openPrintSettings() {
   if (!can('printSettings')) return alert('⚠️ Bạn chưa được cấp quyền chỉnh cài đặt in.');
   document.getElementById('ps-paper').value = String(PAPER_MM);
   document.getElementById('ps-lw').value = labelW; document.getElementById('ps-lh').value = labelH;
+  document.getElementById('ps-label-foot').value = labelFoot;
+  document.getElementById('ps-label-mode').value = LABEL_MODE; setLabelStatus();
   const key = labelW + 'x' + labelH, sel = document.getElementById('ps-label-preset');
   sel.value = Array.from(sel.options).some(o => o.value === key) ? key : 'custom';
   document.getElementById('print-settings-modal').style.display = 'flex';
@@ -5745,7 +5894,9 @@ function applyPrintSettingsFromForm() {
   if (!(w >= 20 && w <= 150 && h >= 15 && h <= 150)) { alert('Khổ tem không hợp lệ (rộng 20-150mm, cao 15-150mm).'); return false; }
   PAPER_MM = document.getElementById('ps-paper').value === '80' ? 80 : 58;
   labelW = Math.round(w); labelH = Math.round(h);
-  try { localStorage.setItem('cuon_paper_w', String(PAPER_MM)); localStorage.setItem('cuon_label_size', labelW + 'x' + labelH); } catch (e) {}
+  labelFoot = document.getElementById('ps-label-foot').value.trim().slice(0, 40);
+  try { LABEL_MODE = document.getElementById('ps-label-mode').value === 'bt' ? 'bt' : 'dialog'; localStorage.setItem('cuon_label_mode', LABEL_MODE); } catch (e) {}
+  try { localStorage.setItem('cuon_paper_w', String(PAPER_MM)); localStorage.setItem('cuon_label_size', labelW + 'x' + labelH); localStorage.setItem('cuon_label_foot', labelFoot); } catch (e) {}
   applyPaperWidth(); refreshLabelUI();
   return true;
 }
@@ -5763,10 +5914,40 @@ async function testLabelPrint() {
   }, null);
 }
 
+// "18/11/2026 08:31:32" -> "18-11-26 08:31"
+function labelDateTime(o) {
+  const m = String(o.created_at || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+  if (!m) return String(o.created_at || '');
+  const p = x => String(x).padStart(2, '0');
+  return p(m[1]) + '-' + p(m[2]) + '-' + m[3].slice(2) + ' ' + p(m[4]) + ':' + m[5];
+}
+// Tem vừa khổ khi: phần dưới cùng nằm trong tem, không bị tràn ngang (strict: tên món/ghi chú cũng không bị cắt chữ)
+function labelFits(l, strict) {
+  const kids = Array.from(l.children).filter(e => getComputedStyle(e).display !== 'none');
+  const last = kids[kids.length - 1];
+  if (!last) return true;
+  const padB = parseFloat(getComputedStyle(l).paddingBottom) || 0;
+  if (last.getBoundingClientRect().bottom > l.getBoundingClientRect().bottom - padB + 1.5) return false;
+  if (l.scrollWidth > l.clientWidth + 1) return false;
+  if (strict) {
+    for (const e of l.querySelectorAll('.l-name, .l-note')) if (e.scrollHeight > e.clientHeight + 1) return false;
+    for (const e of l.querySelectorAll('.l-top, .l-foot, .l-cust')) if (e.scrollWidth > e.clientWidth + 1) return false;
+  }
+  return true;
+}
+// Co chữ dần cho vừa tem; vẫn thiếu chỗ thì bỏ dòng chữ cuối, rồi tên khách, rồi rút ghi chú còn 1 dòng
+function fitLabel(l) {
+  const ks = [1, 0.92, 0.84, 0.76, 0.68, 0.6];
+  const tryK = strict => { for (const k of ks) { l.style.setProperty('--k', k); if (labelFits(l, strict)) return true; } return false; };
+  if (tryK(true)) return;
+  l.classList.add('no-foot'); if (tryK(true)) return;
+  l.classList.add('no-cust'); if (tryK(true)) return;
+  l.classList.add('note-1'); tryK(false);
+}
 function prepareLabelHTML(o, branchName) {
   const box = document.getElementById('label-print');
   const total = kitchenTotalQty(o);
-  const time = String(o.created_at || '').split(' ').pop().slice(0, 5);
+  const dt = labelDateTime(o);
   const cust = (o.name && o.name !== 'Khách Lẻ') ? o.name : '';
   let n = 0, html = '';
   (o.items || []).forEach(i => {
@@ -5774,20 +5955,184 @@ function prepareLabelHTML(o, branchName) {
     for (let k = 0; k < (Number(i.qty) || 0); k++) {
       n++;
       html += `<div class="lbl">
-        <div class="l-top"><span>#${kEsc(o.order_number)}</span><span>${n}/${total}</span></div>
-        <div class="l-name">${kEsc(i.name)}</div>
-        <div class="l-note">${notes ? '» ' + kEsc(notes) : ''}</div>
-        <div class="l-foot"><span>CUỐN+ ${kEsc(time)}</span><span>${kEsc(cust)}</span></div>
+        <div class="l-top"><span>#${kEsc(o.order_number)}</span><span>${kEsc(dt)}</span></div>
+        ${cust ? `<div class="l-cust">${kEsc(cust)}</div>` : ''}
+        <div class="l-main"><div class="l-name">${kEsc(i.name)}</div><div class="l-n">${n}/${total}</div></div>
+        ${notes ? `<div class="l-note">» ${kEsc(notes)}</div>` : ''}
+        ${labelFoot ? `<div class="l-foot">${kEsc(labelFoot)}</div>` : ''}
       </div>`;
     }
   });
   box.style.setProperty('--lw', labelW + 'mm');
   box.style.setProperty('--lh', labelH + 'mm');
   box.innerHTML = html;
+  // đo độ vừa khổ ngoài màn hình (ẩn) rồi mới in
+  const tmp = { display: 'block', position: 'absolute', left: '-10000px', top: '0', visibility: 'hidden' };
+  Object.keys(tmp).forEach(p => box.style[p] = tmp[p]);
+  try { box.querySelectorAll('.lbl').forEach(fitLabel); } catch (e) { console.warn('fitLabel', e); }
+  Object.keys(tmp).forEach(p => box.style.removeProperty(p));
   return n;
 }
 
+// ===================== IN TEM QUA BLUETOOTH (CLABEL CT221D) =====================
+// In chữ thường (KHÔNG DẤU, như bill) bằng lệnh TSPL qua Bluetooth LE: nhẹ, nhanh, không vẽ ảnh.
+// Chỉnh các hằng số dưới đây nếu tem lệch / nhạt / chữ nhỏ hơn thực tế.
+let LABEL_MODE = 'dialog';
+try { if (localStorage.getItem('cuon_label_mode') === 'bt') LABEL_MODE = 'bt'; } catch (e) {}
+const LABEL_DPI = 203;            // độ phân giải đầu in (203 phổ biến; nếu tem nhỏ hơn thực tế thử 300)
+const LABEL_GAP_MM = 2;           // khoảng hở giữa 2 tem
+const LABEL_DENSITY = 8;          // độ đậm 0-15
+const LABEL_CHUNK = 100;          // số byte mỗi lần gửi (nếu in ra chữ lạ/mất dòng thì giảm xuống 20)
+const LABEL_CHUNK_DELAY = 15;     // ms nghỉ giữa các gói
+const LABEL_ID_KEY = 'cuon_label_printer_id';
+const LABEL_SKIP_SERVICES = ['00001800-0000-1000-8000-00805f9b34fb', '00001801-0000-1000-8000-00805f9b34fb', '0000180a-0000-1000-8000-00805f9b34fb'];
+const LABEL_PREF_CHARS = ['0000ffe1-0000-1000-8000-00805f9b34fb', '0000ff02-0000-1000-8000-00805f9b34fb', '00002af1-0000-1000-8000-00805f9b34fb', '49535343-8841-43f4-a8d4-ecbe34729bb3', 'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f'];
+const LABEL_OPT_SERVICES = (() => {
+  const a = []; const f = n => '0000' + n.toString(16).padStart(4, '0') + '-0000-1000-8000-00805f9b34fb';
+  for (let n = 0xfe00; n <= 0xffff; n++) a.push(f(n));
+  [0x1800, 0x1801, 0x180a, 0x18f0, 0xae00, 0xae30, 0xab00, 0xa00a].forEach(n => a.push(f(n)));
+  a.push('49535343-fe7d-41a3-a2f5-4ba6ac75109f', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '6e400001-b5a3-f393-e0a9-e50e24dcca9e', 'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f', '00010203-0405-0607-0809-0a0b0c0d1912');
+  return a;
+})();
+
+let labelDevice = null, labelChar = null, labelDiag = '';
+function setLabelStatus(t) {
+  const el = document.getElementById('label-bt-status'); if (!el) return;
+  el.innerText = t || (labelChar && labelDevice ? 'Máy in tem: đã nối ' + (labelDevice.name || '') : 'Máy in tem: chưa kết nối.');
+}
+async function openLabelChannel(device) {
+  labelDevice = device; labelChar = null;
+  if (!device._lblBound) {
+    device.addEventListener('gattserverdisconnected', () => { labelChar = null; setLabelStatus('Máy in tem: mất kết nối.'); });
+    device._lblBound = true;
+  }
+  const server = await device.gatt.connect();
+  const svcs = await server.getPrimaryServices();
+  const diag = []; let best = null;
+  for (const s of svcs) {
+    diag.push('SERVICE ' + s.uuid);
+    let chars = []; try { chars = await s.getCharacteristics(); } catch (e) {}
+    for (const c of chars) {
+      const p = c.properties;
+      diag.push('  ' + c.uuid + ' [' + ['read', 'write', 'writeWithoutResponse', 'notify', 'indicate'].filter(k => p[k]).join(', ') + ']');
+      if (LABEL_SKIP_SERVICES.includes(s.uuid) || !(p.write || p.writeWithoutResponse)) continue;
+      const score = (p.writeWithoutResponse ? 1 : 0) + (LABEL_PREF_CHARS.includes(c.uuid) ? 2 : 0);
+      if (!best || score > best.score) best = { c, score };
+    }
+  }
+  labelDiag = diag.join('\n'); console.log('Máy in tem BLE:\n' + labelDiag);
+  if (!best) {
+    try { device.gatt.disconnect(); } catch (e) {}
+    throw new Error('Máy in không có cổng nhận lệnh in qua BLE. Nó chỉ công bố:\n' + (labelDiag || '(không có service nào)') + '\n\nCó thể máy in chỉ in qua Bluetooth Classic, khi đó Web Bluetooth không in được.');
+  }
+  labelChar = best.c;
+  try { localStorage.setItem(LABEL_ID_KEY, device.id); } catch (e) {}
+  setLabelStatus();
+}
+async function pickLabelPrinter() {
+  if (!navigator.bluetooth) throw new Error('Trình duyệt này không hỗ trợ Bluetooth (dùng Chrome/Edge).');
+  const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: LABEL_OPT_SERVICES });
+  await openLabelChannel(dev);
+}
+async function connectLabelPrinter() {
+  try { await pickLabelPrinter(); alert('✅ Đã kết nối máy in tem: ' + (labelDevice.name || labelDevice.id)); }
+  catch (e) { if (e && e.name === 'NotFoundError') return; console.error(e); setLabelStatus('Máy in tem: chưa kết nối.'); alert('Không kết nối được máy in tem:\n' + (e && e.message ? e.message : e)); }
+}
+function diagLabelPrinter() { alert(labelDiag ? 'Cổng BLE của máy in tem:\n' + labelDiag : 'Chưa có thông tin. Bấm "Kết nối máy in tem" trước.'); }
+async function ensureLabelPrinter(allowPicker) {
+  if (labelChar && labelDevice && labelDevice.gatt.connected) return;
+  if (labelDevice) { try { await openLabelChannel(labelDevice); return; } catch (e) { console.warn('Nối lại máy in tem lỗi', e); } }
+  try {
+    if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+      const id = localStorage.getItem(LABEL_ID_KEY);
+      const dev = id && (await navigator.bluetooth.getDevices()).find(d => d.id === id);
+      if (dev) { await openLabelChannel(dev); return; }
+    }
+  } catch (e) { console.warn('Tự nối máy in tem lỗi', e); }
+  if (!allowPicker) throw new Error('Chưa kết nối máy in tem.');
+  await pickLabelPrinter();
+}
+
+function labelMm(mm) { return Math.round(mm * LABEL_DPI / 25.4); }
+// Font có sẵn trong máy in TSPL: [rộng, cao] tính bằng chấm (203dpi)
+const LABEL_FONT = { '1': [8, 12], '2': [12, 20], '3': [16, 24], '4': [24, 32] };
+function labelTextCmd(sp) {
+  const dpmm = LABEL_DPI / 25.4, W = Math.round(labelW * dpmm), H = Math.round(labelH * dpmm);
+  const pad = Math.round(1.5 * dpmm), inner = W - pad * 2;
+  const q = x => stripVN(x).replace(/"/g, "'");
+  const top1 = q(sp.top1), top2 = q(sp.top2), cust = q(sp.cust), name = q(sp.name), note = q(sp.note), foot = q(sp.foot);
+  const nTxt = sp.n + '/' + sp.total;
+  const levels = [['3', '2'], ['2', '2'], ['2', '1'], ['1', '1']];                 // [font tên món, font chữ phụ]
+  const flagsList = [{}, { nofoot: 1 }, { nofoot: 1, nocust: 1 }, { nofoot: 1, nocust: 1, note1: 1 }];
+  const build = (lv, fl) => {
+    const cn = LABEL_FONT[lv[0]], cs = LABEL_FONT[lv[1]], fn = lv[0], fs = lv[1];
+    const cmds = []; let y = pad, ok = true;
+    const text = (x, yy, f, t) => cmds.push('TEXT ' + Math.max(0, Math.round(x)) + ',' + Math.round(yy) + ',"' + f + '",0,1,1,"' + t + '"');
+    text(pad, y, fs, top1); text(W - pad - top2.length * cs[0], y, fs, top2);
+    if ((top1.length + top2.length + 1) * cs[0] > inner) ok = false;
+    y += cs[1] + 2; cmds.push('BAR ' + pad + ',' + y + ',' + inner + ',2'); y += 5;
+    if (!fl.nocust && cust) { text(pad, y, fs, cust.slice(0, Math.floor(inner / cs[0]))); y += cs[1] + 2; }
+    const nw = nTxt.length * cs[0] + 8;
+    let nl = wrapPlain(name, Math.max(1, Math.floor((inner - nw) / cn[0])));
+    if (nl.length > 2) { nl = nl.slice(0, 2); ok = false; }
+    nl.forEach((l, i) => text(pad, y + i * (cn[1] + 2), fn, l));
+    text(W - pad - nTxt.length * cs[0], y, fs, nTxt);
+    y += nl.length * (cn[1] + 2) + 2;
+    if (note) {
+      const ml = fl.note1 ? 1 : 2; let ll = wrapPlain('>> ' + note, Math.max(1, Math.floor(inner / cs[0])));
+      if (ll.length > ml) { ll = ll.slice(0, ml); if (!fl.note1) ok = false; }
+      ll.forEach((l, i) => text(pad, y + i * (cs[1] + 2), fs, l)); y += ll.length * (cs[1] + 2);
+    }
+    let limit = H - pad;
+    if (!fl.nofoot && foot) {
+      const f = foot.slice(0, Math.floor(inner / cs[0])), fy = H - pad - cs[1];
+      cmds.push('BAR ' + pad + ',' + (fy - 4) + ',' + inner + ',2'); text((W - f.length * cs[0]) / 2, fy, fs, f); limit = fy - 6;
+    }
+    if (y > limit) ok = false;
+    return { ok, cmds };
+  };
+  let res = null;
+  outer: for (const fl of flagsList) for (const lv of levels) { res = build(lv, fl); if (res.ok) break outer; }
+  const lines = ['SIZE ' + labelW + ' mm,' + labelH + ' mm', 'GAP ' + LABEL_GAP_MM + ' mm,0 mm', 'DIRECTION 1', 'DENSITY ' + LABEL_DENSITY, 'CLS'].concat(res.cmds, ['PRINT 1,1', '']);
+  return new TextEncoder().encode(lines.join('\r\n'));
+}
+async function labelSend(data) {
+  const c = labelChar, noResp = c.properties.writeWithoutResponse && !c.properties.write;
+  const size = noResp ? Math.min(LABEL_CHUNK, 100) : LABEL_CHUNK;
+  for (let i = 0; i < data.length; i += size) {
+    const part = data.slice(i, i + size);
+    if (noResp && c.writeValueWithoutResponse) await c.writeValueWithoutResponse(part); else await c.writeValue(part);
+    await sleep(LABEL_CHUNK_DELAY);
+  }
+}
+function buildLabelSpecs(o) {
+  const total = kitchenTotalQty(o), dt = labelDateTime(o), cust = (o.name && o.name !== 'Khách Lẻ') ? o.name : '';
+  const specs = []; let n = 0;
+  (o.items || []).forEach(i => {
+    const notes = (i.notes && i.notes.length) ? [].concat(i.notes).join(', ') : '';
+    for (let k = 0; k < (Number(i.qty) || 0); k++) { n++; specs.push({ top1: '#' + o.order_number, top2: dt, cust, name: String(i.name || ''), n, total, note: notes, foot: labelFoot }); }
+  });
+  return specs;
+}
+async function printLabelsBT(o) {
+  const specs = buildLabelSpecs(o); if (!specs.length) return;
+  await ensureLabelPrinter(true);
+  for (const sp of specs) {
+    await labelSend(labelTextCmd(sp));
+    await sleep(500);     // chờ máy in nhả xong tem trước khi gửi tem kế tiếp
+  }
+}
+
 async function printLabels(o, branchName) {
+  if (LABEL_MODE === 'bt') {
+    try { await printLabelsBT(o); return; }
+    catch (e) {
+      if (e && e.name === 'NotFoundError') return;
+      console.error('Lỗi in tem Bluetooth:', e); labelChar = null;
+      if (!confirm('Không in được tem qua Bluetooth:\n' + (e && e.message ? e.message : e) + '\n\nBấm OK để thử in bằng hộp thoại in, Cancel để bỏ qua.')) return;
+    }
+  }
+
   if (!prepareLabelHTML(o, branchName)) return;
   await sleep(500);
   const st = document.createElement('style');
@@ -5810,19 +6155,26 @@ async function printLabelsHistory(orderKey, branchName) {
   printLabels(order, branchName);
 }
 
-// In trọn bộ: bill bếp (nếu bật) -> bill khách
-// mode 'all' (mặc định): bill bếp (nếu bật) + bill khách | mode 'kitchen': chỉ bill bếp (in luôn dù badge Bill Bếp đang tắt)
+// mode 'all' (mặc định, nút IN BILL / in tự động): bill bếp (nếu bật) + bill khách + TEM (khi đang bật tem hoặc chọn in tem Bluetooth)
+//   - tem in Bluetooth: máy in bill và máy in tem chạy SONG SONG
+// mode 'kitchen': bill bếp (in luôn dù badge Bill Bếp đang tắt) + tem nếu đang tick "Kèm in tem" (như cũ) | mode 'label': chỉ tem
 async function printOrderBills(o, branchName, viaBT, mode) {
   if (PRINT_MODE === 'usb') viaBT = false;
-  if (mode === 'kitchen') {
-    await printKitchenBill(o, branchName, viaBT);
-  } else {
+  if (mode === 'label') { await printLabels(o, branchName); return; }
+  if (mode === 'kitchen') { await printKitchenBill(o, branchName, viaBT); if (labelEnabled) await printLabels(o, branchName); return; }
+  const wantLabel = labelEnabled || LABEL_MODE === 'bt';
+  const doBills = async () => {
     prepareBillHTML(o, branchName);
     if (kitchenBillEnabled) await printKitchenBill(o, branchName, viaBT);
     if (viaBT) await printCustomerBill(o, branchName);
     else window.print();
+  };
+  if (wantLabel && LABEL_MODE === 'bt') {
+    await Promise.all([doBills(), printLabels(o, branchName).catch(e => console.error('Lỗi in tem:', e))]);
+  } else {
+    await doBills();
+    if (wantLabel) await printLabels(o, branchName);
   }
-  if (labelEnabled) await printLabels(o, branchName);
 }
 
 function prepareBillHTML(orderData, branchNameOverride) {
@@ -5938,15 +6290,19 @@ function prepareBillHTML(orderData, branchNameOverride) {
 
         if (phone) {
           const custRef = db.ref('customers/' + phone);
-          custRef.once('value').then(snapshot => {
-            let currentP = snapshot.exists() ? (snapshot.val().points || 0) : 0;
-            custRef.set({ name, address, points: currentP + pointsEarned, vipDiscount: vipAtSale });
+          custRef.once('value').then(async snapshot => {
+            const old = snapshot.exists() ? (snapshot.val() || {}) : {};
+            const rec = { name, address, points: (old.points || 0) + pointsEarned, vipDiscount: vipAtSale };
+            if (old.code) { rec.code = old.code; rec.codeNum = Number(old.codeNum) || 0; }
+            else if (!snapshot.exists()) { try { const c = await allocCustomerCode(); if (c) { rec.code = c.code; rec.codeNum = c.num; } } catch (e) { console.warn('cấp mã KH', e); } }
+            rec.createdAt = old.createdAt || Date.now();
+            custRef.set(rec);
           });
         }
       }
 
       if (autoPrint) { 
-        printOrderBills(orderData, null, true, autoPrint === 'kitchen' ? 'kitchen' : 'all');
+        printOrderBills(orderData, null, true, (autoPrint === 'kitchen' || autoPrint === 'label') ? autoPrint : 'all');
       }
       else { alert(`✅ LƯU ĐƠN THÀNH CÔNG!\n• Mã HD: ${nextData.invoice_code}\n• STT: #${nextData.order_number}`); }
       
@@ -6894,5 +7250,34 @@ function escHtmlOnline(t) {
 
      </script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
+<script>
+    // Nút ✕ nổi ở góc trên của MỌI khung mở lên (luôn thấy dù kéo xuống) + phím Esc để đóng khung trên cùng.
+    // ✕ bấm vào đúng nút đóng sẵn có của khung đó (không tự đóng ca, không bỏ qua bước bắt buộc).
+    const MODAL_CLOSE_RE = /^\s*close(\w*Modal|PrintSettings)\(\s*\)\s*;?\s*$/;
+    function findModalCloseBtn(ov) {
+      const bs = Array.from(ov.querySelectorAll('button[onclick]')).filter(b => !b.classList.contains('modal-x') && MODAL_CLOSE_RE.test(b.getAttribute('onclick') || ''));
+      return bs.find(b => /^\s*✕/.test(b.textContent)) || bs[0] || null;
+    }
+    function ensureModalX(ov) {
+      if (!ov) return;
+      const box = ov.querySelector('.modal-content') || ov.firstElementChild;
+      if (!box || box.querySelector(':scope > .modal-x-wrap')) return;
+      const src = findModalCloseBtn(ov);
+      if (!src) return;   // khung không có nút đóng an toàn (khung bắt buộc) thì không thêm ✕
+      const w = document.createElement('div'); w.className = 'modal-x-wrap';
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'modal-x'; x.title = 'Đóng (Esc)'; x.setAttribute('aria-label', 'Đóng'); x.textContent = '✕';
+      x.addEventListener('click', () => { const b = findModalCloseBtn(ov); if (b) b.click(); });
+      w.appendChild(x); box.insertBefore(w, box.firstChild);
+      if (/^\s*✕/.test(src.textContent)) src.classList.add('has-modal-x-btn');   // ẩn nút "✕ Đóng" cũ cho khỏi trùng
+    }
+    document.querySelectorAll('.modal-overlay, #menu-manager-modal').forEach(ensureModalX);
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      const open = Array.from(document.querySelectorAll('.modal-overlay, #menu-manager-modal, #shift-modal')).filter(m => getComputedStyle(m).display !== 'none' && m.querySelector('.modal-x'));
+      if (!open.length) return;
+      open.sort((a, b) => ((parseInt(getComputedStyle(b).zIndex) || 0) - (parseInt(getComputedStyle(a).zIndex) || 0)) || ((a.compareDocumentPosition(b) & 4) ? 1 : -1));
+      open[0].querySelector('.modal-x').click();
+    });
+  </script>
 </body>
 </html>
