@@ -5837,7 +5837,7 @@ async function btPrintLines(lines, mode) {
   await sleep(600);
 }
 
-async function printKitchenBill(o, branchName, viaBT) {
+async function printKitchenBill(o, branchName, viaBT, noDialog) {
   if (viaBT) {
     const ready = await reconnectPrinterSilently();
     if (ready) {
@@ -5845,6 +5845,7 @@ async function printKitchenBill(o, branchName, viaBT) {
       catch (e) { console.error('Lỗi in bill bếp qua Bluetooth:', e); bluetoothServer = null; printerCharacteristic = null; }
     }
   }
+  if (viaBT && noDialog) { btBillFailNotice('bill bếp'); return; }   // tem đang in trực tiếp: không đẩy bill bếp sang hộp thoại in
   prepareKitchenHTML(o, branchName);
   document.body.classList.add('print-kitchen');
   try { window.print(); } finally { await sleep(800); document.body.classList.remove('print-kitchen'); }
@@ -5870,15 +5871,29 @@ async function ensurePrinterReady(allowPicker) {
   }
 }
 
-async function printCustomerBill(o, branchName, allowPicker) {
+// Báo lỗi in bill Bluetooth (gộp: bill bếp + bill khách lỗi cùng lúc chỉ hiện 1 thông báo)
+let _btFailAt = 0;
+function btBillFailNotice(what) {
+  console.warn('Không in được ' + what + ' qua máy in Bluetooth.');
+  try { setPrinterStatus('🖨️ Kết nối máy in', false); } catch (e) {}
+  if (Date.now() - _btFailAt < 8000) return;
+  _btFailAt = Date.now();
+  setTimeout(() => alert('⚠️ Không in được ' + what + ' qua máy in Bluetooth.\n• Kiểm tra máy in bill đã bật và ở gần.\n• Bấm nút "🖨️ Kết nối máy in" trên thanh trên, rồi in lại đơn này ở Lịch sử.\n(Tem vẫn in bình thường; bill không bị đẩy sang máy in tem.)'), 0);
+}
+
+async function printCustomerBill(o, branchName, allowPicker, noDialog) {
   if (PRINT_MODE === 'usb') { window.print(); return; }   // in dây: bill khách in bằng hộp thoại in (bill đã được dựng sẵn)
-  const ready = await ensurePrinterReady(allowPicker);
+  let ready = await ensurePrinterReady(allowPicker);
+  if (!ready && noDialog) {                                // thử nối lại thêm vài lần trước khi báo lỗi
+    for (let i = 0; i < 2 && !ready; i++) { await sleep(1200); ready = await ensurePrinterReady(false); }
+  }
   if (ready) {
     try { await btPrintLines(buildCustomerLines(o, branchName), btPrintMode); return; }
     catch (e) { console.error('Lỗi in bill khách qua Bluetooth:', e); bluetoothServer = null; printerCharacteristic = null; }
   } else {
     setPrinterStatus('🖨️ Kết nối máy in', false);
   }
+  if (noDialog) { btBillFailNotice('bill khách'); return; }   // tem đang in trực tiếp: không đẩy bill sang máy in mặc định (thường là máy in tem)
   window.print();
 }
 
@@ -6193,6 +6208,24 @@ async function ensureLabelPrinter(allowPicker) {
 function labelMm(mm) { return Math.round(mm * LABEL_DPI / 25.4); }
 // Font có sẵn trong máy in TSPL: [rộng, cao] tính bằng chấm (203dpi)
 const LABEL_FONT = { '1': [8, 12], '2': [12, 20], '3': [16, 24], '4': [24, 32] };
+// Độ rộng THỰC TẾ 1 ký tự (chấm) mà máy in tem này in ra, chỉ dùng để tính ngắt dòng/căn giữa tên món.
+// Font '4' của máy in này in hẹp hơn bảng chuẩn (24 chấm) nên trước đây tên bị ngắt dòng quá sớm.
+// Nếu tên vẫn xuống dòng quá sớm thì GIẢM số này; nếu chữ bị cụt ở lề phải thì TĂNG số này.
+const LABEL_FONT_ADV = { '4': 14 };
+function wrapPlainFirst(str, w1, w2) {   // như wrapPlain nhưng dòng đầu rộng w1 (chừa chỗ số ly 1/2), các dòng sau rộng w2
+  const out = [], L = () => (out.length ? w2 : w1);
+  String(str == null ? '' : str).normalize('NFC').split('\n').forEach(par => {
+    let line = '';
+    par.split(/\s+/).filter(Boolean).forEach(w => {
+      while (w.length > L()) { if (line) { out.push(line); line = ''; } const k = L(); out.push(w.slice(0, k)); w = w.slice(k); }
+      if (!line) line = w;
+      else if ((line + ' ' + w).length <= L()) line += ' ' + w;
+      else { out.push(line); line = w; }
+    });
+    out.push(line);
+  });
+  return out.length ? out : [''];
+}
 function labelTextCmd(sp) {
   const C = LABEL_CFG;
   const dpmm = LABEL_DPI / 25.4, W = Math.round(labelW * dpmm), H = Math.round(labelH * dpmm);
@@ -6221,9 +6254,10 @@ function labelTextCmd(sp) {
     }
     if (!fl.nocust && cust) { text(padX, y, fs, cust.slice(0, Math.floor(inner / cs[0])), false); y += cs[1] + 2; }
     const nw = nTxt ? nTxt.length * cs[0] + 8 : 0, availW = inner - nw;
-    let nl = wrapPlain(name, Math.max(1, Math.floor(availW / cn[0])));
+    const adv = LABEL_FONT_ADV[fn] || cn[0];                       // độ rộng thật 1 ký tự của font tên món
+    let nl = wrapPlainFirst(name, Math.max(1, Math.floor(availW / adv)), Math.max(1, Math.floor(inner / adv)));   // dòng 1 chừa chỗ số ly, dòng 2+ dùng hết bề ngang
     if (nl.length > C.nameLines) { nl = nl.slice(0, C.nameLines); ok = false; }
-    nl.forEach((l, i) => text(C.nameAlign === 'center' ? padX + Math.max(0, (availW - l.length * cn[0]) / 2) : padX, y + i * (cn[1] + 2), fn, l, true));
+    nl.forEach((l, i) => text(C.nameAlign === 'center' ? padX + Math.max(0, ((i ? inner : availW) - l.length * adv) / 2) : padX, y + i * (cn[1] + 2), fn, l, true));
     if (nTxt) text(W - padX - nTxt.length * cs[0] - 2, y, fs, nTxt, true);
     y += nl.length * (cn[1] + 2) + 2;
     if (note) {
@@ -6311,18 +6345,22 @@ async function printLabelsHistory(orderKey, branchName) {
 //   - tem in Bluetooth: máy in bill và máy in tem chạy SONG SONG
 // mode 'kitchen': bill bếp (in luôn dù badge Bill Bếp đang tắt) + tem nếu đang tick "Kèm in tem" (như cũ) | mode 'label': chỉ tem
 async function printOrderBills(o, branchName, viaBT, mode) {
-  if (PRINT_MODE === 'usb') viaBT = false;
+  // "Kiểu in" (nút trên thanh trên) quyết định cho MỌI đường in bill: nút IN BILL, tự động in đơn online, đơn sàn.
+  // Bluetooth => luôn đi qua máy in bill Bluetooth, không để tham số truyền vào làm bill rơi sang hộp thoại in của hệ thống
+  // (nơi máy in mặc định rất có thể chính là máy in tem => bill bị in ra tem).
+  viaBT = (PRINT_MODE !== 'usb');
+  const noDlg = viaBT && labelDirect();   // đang in tem trực tiếp (USB/BT): bill Bluetooth lỗi thì báo rõ, KHÔNG đẩy bill sang máy in mặc định
   if (mode === 'label') { await printLabels(o, branchName); return; }
-  if (mode === 'kitchen') { await printKitchenBill(o, branchName, viaBT); if (labelEnabled) await printLabels(o, branchName); return; }
+  if (mode === 'kitchen') { await printKitchenBill(o, branchName, viaBT, noDlg); if (labelEnabled) await printLabels(o, branchName); return; }
   const wantLabel = labelEnabled || labelDirect();
   const doBills = async () => {
     prepareBillHTML(o, branchName);
-    if (kitchenBillEnabled) await printKitchenBill(o, branchName, viaBT);
-    if (viaBT) await printCustomerBill(o, branchName);
+    if (kitchenBillEnabled) await printKitchenBill(o, branchName, viaBT, noDlg);
+    if (viaBT) await printCustomerBill(o, branchName, false, noDlg);
     else window.print();
   };
   if (wantLabel && labelDirect()) {
-    await Promise.all([doBills(), printLabels(o, branchName).catch(e => console.error('Lỗi in tem:', e))]);
+    await Promise.all([doBills().catch(e => console.error('Lỗi in bill:', e)), printLabels(o, branchName).catch(e => console.error('Lỗi in tem:', e))]);
   } else {
     await doBills();
     if (wantLabel) await printLabels(o, branchName);
