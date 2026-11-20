@@ -3139,11 +3139,12 @@ main { min-height: 0; }
         totalItemsQty += item.qty;
         const L = T.lines[index];
 
-        let availableChips = item.availableNotes || [];
-        if (availableChips.length === 0) {
-          if (item.type === 'drink') availableChips = ['nguyên bản 100%', 'ít ngọt 50%', 'đá chung', 'đá riêng', 'không đá'];
-          else availableChips = ['sốt để chung', 'sốt để riêng', 'không rau', 'không xoài', 'không hành', 'không cay', 'cay'];
-        }
+        // Chỉ hiện những ghi chú đã tick ở Quản lý menu: món không tick gì thì không có hàng ghi chú
+        let availableChips = Array.isArray(item.availableNotes) ? item.availableNotes.slice() : (() => {
+          const mi = liveMenuObject && liveMenuObject[String(item.id)];
+          return (mi && Array.isArray(mi.notes)) ? mi.notes.slice() : [];
+        })();
+        (item.notes || []).forEach(n => { if (!availableChips.includes(n)) availableChips.push(n); });   // ghi chú đã chọn (VD đơn online) vẫn hiện để bỏ chọn
 
         const isGiftItem = (item.price === 0) || (item.name && item.name.includes('[TẶNG'));
 
@@ -3166,11 +3167,11 @@ main { min-height: 0; }
               </div>
             </div>
             ${priceHtml}
-            <div class="note-chips">
+            ${availableChips.length ? `<div class="note-chips">
               ${availableChips.map(chip => `
                 <span class="chip ${item.notes.includes(chip)?'selected':''}" data-note="${escHtmlOnline(chip)}" onclick="toggleNoteByIndex(${index}, this.dataset.note)">${escHtmlOnline(chip)}</span>
               `).join('')}
-            </div>
+            </div>` : ''}
           </div>
         `;
       }).join('');
