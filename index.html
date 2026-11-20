@@ -271,6 +271,8 @@
 .app-cat-title { position:sticky; top:0; background:#f3e9da; color:#6b3b00; font-size:11px; font-weight:bold; padding:4px 10px; }
 .app-row { display:flex; align-items:center; gap:8px; padding:7px 10px; border-bottom:1px solid #f1e8da; font-size:12.5px; }
 .app-row.on { background:#fff7e6; }
+.app-notes { display:none; flex-wrap:wrap; gap:4px; padding:4px 10px 8px 36px; background:#fff7e6; border-bottom:1px solid #f1e8da; }
+.app-notes .chip { font-size:11px; padding:3px 8px; }
 .app-row label { flex:1; display:flex; align-items:center; gap:8px; cursor:pointer; min-width:0; }
 .app-row input[type=checkbox] { width:18px; height:18px; accent-color:#8b1f1f; flex:0 0 auto; }
 .app-row .app-nm { flex:1; min-width:0; font-weight:600; }
@@ -412,6 +414,8 @@ main { min-height: 0; }
           <button type="button" onclick="clearMenuImage()" style="background:#757575; color:#fff; border:none; padding:5px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Xóa ảnh</button>
         </div>
 
+        <label style="font-size:11px; font-weight:bold; display:block; margin-bottom:4px; color:#444;">🏷️ Lời nhắn luôn in trên tem dán ly/hộp của món này (VD: Khuấy đều trước khi uống, không bắt buộc):</label>
+        <input type="text" id="menu-item-label-note" maxlength="80" placeholder="VD: Khuấy đều trước khi uống" style="width:100%; padding:8px; box-sizing:border-box; margin-bottom:10px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
         <label style="font-size:11px; font-weight:bold; display:block; margin-bottom:4px; color:#444;">Chọn ghi chú mặc định hiển thị trên POS (Tích chọn):</label>
         <div id="modal-note-checkboxes" style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; background:#fff; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:10px; font-size:11px;">
           <label><input type="checkbox" value="sốt để chung"> sốt để chung</label>
@@ -1080,7 +1084,7 @@ main { min-height: 0; }
       <div id="eo-meta" style="font-size:11px; color:#6b5a4d; margin-bottom:8px;"></div>
       <div class="eo-grid">
         <div><label>Khách hàng</label><input type="text" id="eo-name"></div>
-        <div><label>Số điện thoại</label><input type="text" id="eo-phone"></div>
+        <div><label>Số điện thoại</label><input type="text" id="eo-phone" oninput="eoPhoneHint()"><div id="eo-phone-hint" style="font-size:11px; margin-top:3px;"></div></div>
         <div><label>Hình thức thanh toán</label><select id="eo-pay"></select></div>
         <div><label>Ghi chú đơn (in lên bill)</label><input type="text" id="eo-note"></div>
       </div>
@@ -1100,7 +1104,7 @@ main { min-height: 0; }
         <div><label>Khách đưa (đ)</label><input type="number" id="eo-cash" oninput="recalcEditOrder()"></div>
       </div>
       <div class="eo-sum" id="eo-sum"></div>
-      <label style="font-size:11px; display:flex; align-items:center; gap:6px; margin-bottom:8px;"><input type="checkbox" id="eo-pts" checked> Cập nhật điểm tích lũy của khách theo hóa đơn sau khi sửa</label>
+      <label style="font-size:11px; display:flex; align-items:center; gap:6px; margin-bottom:8px;"><input type="checkbox" id="eo-pts" checked> Cập nhật điểm tích lũy theo hóa đơn sau khi sửa (SĐT khách có sẵn: cộng dồn điểm; SĐT mới: tự tạo hồ sơ khách và tích điểm)</label>
       <div style="display:flex; gap:6px; flex-wrap:wrap;">
         <button class="btn-pay" style="margin:0; flex:1;" onclick="saveEditedOrder(false)">💾 LƯU THAY ĐỔI</button>
         <button class="btn-print" style="margin:0; flex:1;" onclick="saveEditedOrder(true)">🖨️ LƯU & IN LẠI BILL</button>
@@ -2237,7 +2241,7 @@ main { min-height: 0; }
       document.getElementById('app-order-code').value = '';
       document.getElementById('app-order-price').value = '';
       document.getElementById('app-order-note').value = '';
-      appOrderSel = {}; appPriceManual = false;
+      appOrderSel = {}; appOrderNotes = {}; appPriceManual = false;
       document.getElementById('app-menu-search').value = '';
       renderAppMenuList();
       recalcAppTotal();
@@ -2247,18 +2251,19 @@ main { min-height: 0; }
 
     // ----- Chọn món cho đơn sàn: tick chọn, giá lấy theo "giá trên sàn" của từng món -----
     let appOrderSel = {};          // key món -> số lượng
+    let appOrderNotes = {};        // key món -> các ghi chú đã chọn (hiện trên bill, bill bếp, tem)
     let appPriceManual = false;    // true khi nhân viên tự sửa ô tổng tiền thực thu
     const appNorm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
     function appItemPrice(it) { const p = Number(it && it.appPrice) || 0; return p > 0 ? p : (Number(it && it.price) || 0); }
 
     // Tính danh sách món + tổng tạm tính từ các món đã tick (hàm thuần, dễ kiểm tra)
-    function computeAppOrderLines(sel, menu) {
+    function computeAppOrderLines(sel, menu, notesSel) {
       const items = []; let sum = 0, count = 0;
       Object.keys(sel || {}).forEach(k => {
         const qty = Number(sel[k]) || 0, it = (menu || {})[k];
         if (qty <= 0 || !it) return;
         const price = appItemPrice(it);
-        items.push({ id: String(it.id != null ? it.id : k), name: it.name, price, qty, type: it.type || 'food', notes: [] });
+        items.push({ id: String(it.id != null ? it.id : k), name: it.name, price, qty, type: it.type || 'food', notes: (notesSel && Array.isArray(notesSel[k])) ? notesSel[k].slice() : [] });
         sum += price * qty; count += qty;
       });
       return { items, sum, count };
@@ -2283,20 +2288,34 @@ main { min-height: 0; }
       }
       box.innerHTML = cats.map(cat => '<div class="app-cat-title">' + escHtmlOnline(cat) + '</div>' + groups[cat].map(k => {
         const it = liveMenuObject[k], qty = appOrderSel[k] || 0, hasApp = (Number(it.appPrice) || 0) > 0;
+        const chips = (Array.isArray(it.notes) ? it.notes : []).map(n => '<span class="chip' + ((appOrderNotes[k] || []).includes(n) ? ' selected' : '') + '" data-k="' + escHtmlOnline(k) + '" data-note="' + escHtmlOnline(n) + '" onclick="toggleAppNote(this)">' + escHtmlOnline(n) + '</span>').join('');
+        const notesBox = chips ? '<div class="app-notes" data-k="' + escHtmlOnline(k) + '" style="display:' + (qty > 0 ? 'flex' : 'none') + ';">' + chips + '</div>' : '';
         return '<div class="app-row' + (qty > 0 ? ' on' : '') + '" data-k="' + escHtmlOnline(k) + '">' +
           '<label><input type="checkbox"' + (qty > 0 ? ' checked' : '') + ' onchange="toggleAppItem(this.closest(\'.app-row\').dataset.k, this.checked)">' +
           '<span class="app-nm">' + escHtmlOnline(it.name) + '</span></label>' +
           '<span class="app-pr">' + appItemPrice(it).toLocaleString() + 'đ' + (hasApp ? '' : '<small>(chưa có giá sàn)</small>') + '</span>' +
           '<span class="app-qty"><button type="button" onclick="changeAppQty(this.closest(\'.app-row\').dataset.k, -1)">−</button><span class="app-qty-n">' + (qty || 1) + '</span><button type="button" onclick="changeAppQty(this.closest(\'.app-row\').dataset.k, 1)">+</button></span>' +
-          '</div>';
+          '</div>' + notesBox;
       }).join('')).join('');
     }
     function appRowOf(k) { return Array.from(document.querySelectorAll('#app-menu-list .app-row')).find(r => r.dataset.k === k); }
     function toggleAppItem(k, on) {
-      if (on) appOrderSel[k] = appOrderSel[k] || 1; else delete appOrderSel[k];
+      if (on) appOrderSel[k] = appOrderSel[k] || 1; else { delete appOrderSel[k]; delete appOrderNotes[k]; }
       const row = appRowOf(k);
-      if (row) { row.classList.toggle('on', !!on); row.querySelector('.app-qty-n').innerText = appOrderSel[k] || 1; }
+      if (row) {
+        row.classList.toggle('on', !!on); row.querySelector('.app-qty-n').innerText = appOrderSel[k] || 1;
+        const nb = row.nextElementSibling;
+        if (nb && nb.classList.contains('app-notes')) { nb.style.display = on ? 'flex' : 'none'; if (!on) nb.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected')); }
+      }
       recalcAppTotal();
+    }
+    // Bấm chip ghi chú của món (giống ghi chú trong giỏ hàng POS)
+    function toggleAppNote(el) {
+      const k = el.dataset.k, n = el.dataset.note;
+      if (!k || !n || !appOrderSel[k]) return;
+      const a = appOrderNotes[k] = appOrderNotes[k] || [], i = a.indexOf(n);
+      if (i >= 0) a.splice(i, 1); else a.push(n);
+      el.classList.toggle('selected', i < 0);
     }
     function changeAppQty(k, d) {
       const n = (appOrderSel[k] || 1) + d;
@@ -2326,7 +2345,7 @@ main { min-height: 0; }
       let priceInput = parseFloat(document.getElementById('app-order-price').value) || 0;
       const note = document.getElementById('app-order-note').value.trim();
 
-      const picked = computeAppOrderLines(appOrderSel, liveMenuObject);
+      const picked = computeAppOrderLines(appOrderSel, liveMenuObject, appOrderNotes);
       const hasItems = picked.items.length > 0;
       if (!hasItems && priceInput <= 0) return alert("Vui lòng tick chọn món hoặc nhập tổng tiền thực thu hợp lệ!");
 
@@ -3597,6 +3616,7 @@ function setHistoryFilterRange(rangeType) {
       document.getElementById('eo-meta').innerText = 'Chi nhánh: ' + editingOrder.branch + ' | Giờ: ' + (o.created_at || '') + (o.editedAt ? ' | Đã sửa ' + (o.editCount || 1) + ' lần (gần nhất bởi ' + (o.editedBy || '') + ')' : '');
       document.getElementById('eo-name').value = o.name || '';
       document.getElementById('eo-phone').value = o.phone || '';
+      document.getElementById('eo-phone-hint').innerHTML = ''; eoPhoneHint();
       document.getElementById('eo-note').value = o.orderNote || '';
       const payVals = ['Tiền mặt', 'Chuyển khoản (Banking)'];
       const cur = o.payMethod || 'Tiền mặt';
@@ -3671,6 +3691,87 @@ function setHistoryFilterRange(rangeType) {
         '<div class="eo-total"><span>Tổng thanh toán mới:</span><span>' + m(T.total) + '</span></div>' +
         '<div style="font-size:10px; color:#8a7260;"><span>Tổng cũ: ' + m(old) + '</span><span>Chênh lệch: ' + (T.total - old >= 0 ? '+' : '-') + m(Math.abs(T.total - old)) + '</span></div>';
     }
+    // ===== Tích điểm cho đơn đã thanh toán (nhập / đổi SĐT khi sửa đơn) =====
+    // SĐT hợp lệ = 9-11 số sau khi chuẩn hóa (0912.345.678 / +84912345678 -> 0912345678)
+    function eoPhoneKey(raw) { const d = normalizePhoneVN(raw); return (d.length >= 9 && d.length <= 11) ? d : ''; }
+    // Tìm khách đã có theo SĐT (thử cả dạng gõ tay lẫn dạng chuẩn hóa). Chưa có thì trả key chuẩn để tạo mới.
+    async function eoCustomerKey(raw) {
+      const t = String(raw || '').trim(), n = eoPhoneKey(raw);
+      const cands = [...new Set([t, n].filter(k => k && !/[.#$\[\]\/]/.test(k)))];
+      for (const k of cands) {
+        const snap = await db.ref('customers/' + k).once('value');
+        if (snap.exists()) return { key: k, snap };
+      }
+      return { key: n, snap: null };
+    }
+    // add: số điểm cộng (âm = trừ) cho khách có sẵn; createWith: số điểm khi phải tạo khách mới (null = không tạo)
+    async function eoAdjustPoints(raw, add, createWith, info) {
+      const f = await eoCustomerKey(raw);
+      if (!f.key) return null;
+      const ref = db.ref('customers/' + f.key);
+      if (f.snap) {
+        const cur = f.snap.val() || {};
+        if (!add) return { key: f.key, created: false, total: Number(cur.points) || 0, name: cur.name || '' };
+        const r = await ref.child('points').transaction(p => Math.max(0, (Number(p) || 0) + add));
+        return { key: f.key, created: false, total: Number(r.snapshot.val()) || 0, name: cur.name || '' };
+      }
+      if (createWith == null) return null;
+      const rec = { name: (info && info.name) || '', address: (info && info.address) || '', points: createWith, vipDiscount: false };
+      try { const c = await allocCustomerCode(); if (c) { rec.code = c.code; rec.codeNum = c.num; } } catch (e) { console.warn('cấp mã KH', e); }
+      rec.createdAt = Date.now();
+      await ref.set(rec);
+      return { key: f.key, created: true, total: createWith, name: rec.name };
+    }
+    // Trả về dòng thông báo (rỗng nếu không có gì để báo). prev = đơn trước khi sửa.
+    async function eoApplyPoints(prev, phoneRaw, pointsEarned, custName) {
+      const oldRaw = String(prev.phone || '').trim(), oldOk = !!eoPhoneKey(oldRaw), newOk = !!eoPhoneKey(phoneRaw);
+      if (phoneRaw && !newOk) return '⚠️ SĐT chưa hợp lệ (cần 9-11 số) nên chưa tích điểm.';
+      const oldCredit = oldOk ? (Number(prev.pointsEarned) || 0) : 0;   // đơn chưa có SĐT thì điểm chưa từng được cộng cho ai
+      const newCredit = newOk ? pointsEarned : 0;
+      const info = { name: custName === 'Khách Lẻ' ? '' : (custName || ''), address: prev.address || '' };
+      const who = r => (r.name ? r.name + ' ' : '') + '(' + r.key + ')';
+      let msg = '';
+      if (oldOk && newOk && eoPhoneKey(oldRaw) === eoPhoneKey(phoneRaw)) {            // cùng khách: chỉ cộng/trừ phần chênh
+        const d = newCredit - oldCredit;
+        const r = await eoAdjustPoints(phoneRaw, d, newCredit, info);
+        if (r && r.created) msg = '🆕 Khách chưa có trong danh sách: đã tạo hồ sơ ' + who(r) + ' và tích ' + newCredit + ' điểm.';
+        else if (r && d !== 0) msg = '⭐ Đã ' + (d > 0 ? 'cộng ' : 'trừ ') + Math.abs(d) + ' điểm cho khách ' + who(r) + ' — tổng ' + r.total + ' điểm.';
+        return msg;
+      }
+      if (oldOk && oldCredit) {                                                        // đổi / xóa SĐT: thu hồi điểm đã cộng cho khách cũ
+        const r0 = await eoAdjustPoints(oldRaw, -oldCredit, null, info);
+        if (r0) msg += '↩️ Đã trừ ' + oldCredit + ' điểm của khách cũ ' + who(r0) + '.\n';
+      }
+      if (newOk) {                                                                     // SĐT mới: cộng dồn nếu khách có sẵn, chưa có thì tạo khách mới
+        const r = await eoAdjustPoints(phoneRaw, newCredit, newCredit, info);
+        if (r && r.created) msg += '🆕 SĐT mới: đã tạo hồ sơ khách ' + who(r) + ' và tích ' + newCredit + ' điểm.';
+        else if (r) msg += '⭐ Đã cộng ' + newCredit + ' điểm cho khách ' + who(r) + ' — tổng ' + r.total + ' điểm.';
+      }
+      return msg.trim();
+    }
+    // Gợi ý ngay khi gõ SĐT: khách có sẵn hay SĐT mới
+    let _eoPhoneTimer = null;
+    function eoPhoneHint() {
+      clearTimeout(_eoPhoneTimer);
+      _eoPhoneTimer = setTimeout(async () => {
+        const box = document.getElementById('eo-phone-hint'), inp = document.getElementById('eo-phone');
+        if (!box || !inp) return;
+        const raw = inp.value.trim();
+        if (!raw) { box.innerHTML = ''; return; }
+        if (!eoPhoneKey(raw)) { box.innerHTML = '<span style="color:#c62828;">SĐT chưa hợp lệ (cần 9-11 số), chưa tích được điểm.</span>'; return; }
+        if (!db) return;
+        try {
+          const f = await eoCustomerKey(raw);
+          if (inp.value.trim() !== raw) return;   // đã gõ tiếp
+          if (f.snap) {
+            const c = f.snap.val() || {};
+            box.innerHTML = '<span style="color:#2e7d32;">✅ Khách đã có' + (c.name ? ': ' + escHtmlOnline(c.name) : '') + ' — hiện ' + (Number(c.points) || 0) + ' điểm (sẽ tự cộng dồn)</span>';
+            const nm = document.getElementById('eo-name'); if (nm && !nm.value.trim() && c.name) nm.value = c.name;
+          } else box.innerHTML = '<span style="color:#e65100;">🆕 SĐT mới, chưa có trong danh sách khách: khi lưu sẽ tự tạo hồ sơ khách và tích điểm.</span>';
+        } catch (e) { box.innerHTML = ''; }
+      }, 350);
+    }
+
     async function saveEditedOrder(andPrint) {
       const E = editingOrder;
       if (!E) return;
@@ -3688,7 +3789,8 @@ function setHistoryFilterRange(rangeType) {
       const prev = E.orig, now = Date.now();
       let cash = Number(document.getElementById('eo-cash').value) || T.total;
       if (cash < T.total) cash = T.total;
-      const phone = document.getElementById('eo-phone').value.trim();
+      const phoneRaw = document.getElementById('eo-phone').value.trim();
+      const phone = eoPhoneKey(phoneRaw) || phoneRaw;   // lưu SĐT đã chuẩn hóa để khớp danh sách khách
       const pointsEarned = Math.floor(T.gross / (currentShopConfig.pointRate || 10000));
       const log = Array.isArray(prev.editLog) ? prev.editLog.slice(-19) : [];
       log.push({
@@ -3714,16 +3816,16 @@ function setHistoryFilterRange(rangeType) {
         const logged = await auditOrder(E.branch, 'sửa', prev, updates, changes);
         if (!logged) return alert('❌ Không ghi được nhật ký nên CHƯA lưu sửa đơn.\nKiểm tra kết nối mạng và quyền ghi của nhánh "' + E.branch + '" (auditLog) trong Firebase Rules.');
         await db.ref('branches/' + E.branch + '/orders/' + E.key).update(updates);
-        // Điểm tích lũy: chỉ chỉnh khi cùng số điện thoại và khách đã có trong danh sách
-        const delta = pointsEarned - (Number(prev.pointsEarned) || 0);
-        if (document.getElementById('eo-pts').checked && phone && phone === (prev.phone || '') && delta !== 0) {
-          const snap = await db.ref('customers/' + phone).once('value');
-          if (snap.exists()) await db.ref('customers/' + phone + '/points').transaction(p => Math.max(0, (Number(p) || 0) + delta));
+        // Điểm tích lũy: SĐT có sẵn trong danh sách khách -> cộng dồn; SĐT mới -> tự tạo hồ sơ khách và tích điểm
+        let ptsMsg = '';
+        if (document.getElementById('eo-pts').checked) {
+          try { ptsMsg = await eoApplyPoints(prev, phoneRaw, pointsEarned, updates.name); }
+          catch (pe) { console.error(pe); ptsMsg = '⚠️ Đã lưu đơn nhưng chưa cập nhật được điểm khách: ' + (pe && pe.message ? pe.message : pe); }
         }
         Object.assign(prev, updates);
         closeEditOrderModal();
-        if (andPrint) await historyBluetoothPrint(prev, E.branch, 'bill');
-        else alert('✅ Đã lưu hóa đơn sau khi sửa!');
+        if (andPrint) { await historyBluetoothPrint(prev, E.branch, 'bill'); if (ptsMsg) alert(ptsMsg); }
+        else alert('✅ Đã lưu hóa đơn sau khi sửa!' + (ptsMsg ? '\n' + ptsMsg : ''));
         loadHistoryData();
       } catch (e) {
         console.error(e);
@@ -5990,6 +6092,19 @@ async function testLabelPrint() {
 }
 
 // "18/11/2026 08:31:32" -> "18-11-26 08:31"
+// Lời nhắn cố định của món (đặt ở Quản lý menu) tự thêm vào ghi chú trên tem
+function labelMsgFor(i) {
+  try {
+    const M = liveMenuObject || {}, id = String(i && i.id != null ? i.id : '');
+    const m = M[id] || M['item_' + id] || Object.values(M).find(x => x && ((id && String(x.id) === id) || (x.name && i && x.name === i.name)));
+    return (m && m.labelNote) ? String(m.labelNote).trim().slice(0, 80) : '';
+  } catch (e) { return ''; }
+}
+function labelNotesText(i) {
+  const a = (i && i.notes && i.notes.length) ? [].concat(i.notes) : [], m = labelMsgFor(i);
+  if (m && !a.includes(m)) a.push(m);
+  return a.join(', ');
+}
 function labelDateTime(o) {
   const m = String(o.created_at || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
   if (!m) return String(o.created_at || '');
@@ -6031,7 +6146,7 @@ function prepareLabelHTML(o, branchName) {
   const cust = (o.name && o.name !== 'Khách Lẻ') ? o.name : '';
   let n = 0, html = '';
   (o.items || []).forEach(i => {
-    const notes = (i.notes && i.notes.length) ? i.notes.join(', ') : '';
+    const notes = labelNotesText(i);
     for (let k = 0; k < (Number(i.qty) || 0); k++) {
       n++;
       const topParts = (C.showNum ? '<span>#' + kEsc(o.order_number) + '</span>' : (C.showTime ? '<span></span>' : '')) + (C.showTime ? '<span>' + kEsc(dt) + '</span>' : '');
@@ -6295,7 +6410,7 @@ function buildLabelSpecs(o) {
   const total = kitchenTotalQty(o), dt = labelDateTime(o), cust = (o.name && o.name !== 'Khách Lẻ') ? o.name : '';
   const specs = []; let n = 0;
   (o.items || []).forEach(i => {
-    const notes = (i.notes && i.notes.length) ? [].concat(i.notes).join(', ') : '';
+    const notes = labelNotesText(i);
     for (let k = 0; k < (Number(i.qty) || 0); k++) { n++; specs.push({ top1: '#' + o.order_number, top2: dt, cust, name: String(i.name || ''), n, total, note: notes, foot: labelFoot }); }
   });
   return specs;
@@ -6939,7 +7054,7 @@ function escHtmlOnline(t) {
         div.innerHTML = `
           <div>
             <strong>${escHtmlOnline(item.name)}</strong> - <span style="color:#e53935; font-weight:bold;">${Number(item.price).toLocaleString()}đ</span>${item.appPrice ? ` <span style="color:#e65100; font-weight:bold;">| Sàn: ${Number(item.appPrice).toLocaleString()}đ</span>` : ''}
-            <br><small style="color:#666;">[${escHtmlOnline(item.category || 'Cuốn')}] | Ghi chú: ${escHtmlOnline([].concat(item.notes || []).join(', ') || 'Không')}</small>
+            <br><small style="color:#666;">[${escHtmlOnline(item.category || 'Cuốn')}] | Ghi chú: ${escHtmlOnline([].concat(item.notes || []).join(', ') || 'Không')}${item.labelNote ? ' | 🏷️ Tem: ' + escHtmlOnline(item.labelNote) : ''}</small>
           </div>
           <div>
             <button data-k="${escHtmlOnline(key)}" onclick="fillEditMenuItem(this.dataset.k)" style="background:#f59e0b; color:white; border:none; padding:4px 8px; border-radius:4px; margin-right:4px; cursor:pointer; font-weight:bold;">Sửa</button>
@@ -7021,7 +7136,7 @@ function escHtmlOnline(t) {
           : (pendingMenuImage === '' ? db.ref('shopMenuImages/' + id).remove() : db.ref('shopMenuImages/' + id).set(pendingMenuImage));
         const _oldItem = liveMenuObject[String(id)];
         db.ref('shopMenu/' + id).set({
-          id: String(id), name, price, appPrice, category, type, notes: selectedNotes, desc
+          id: String(id), name, price, appPrice, category, type, notes: selectedNotes, desc, labelNote: (document.getElementById('menu-item-label-note').value || '').trim().slice(0, 80)
         }).then(() => imgTask).then(() => {
           if (!_oldItem) auditEvent('thêm món', [name + ' — ' + fmtMoney(price) + 'đ']);
           else if (Number(_oldItem.price) !== price) auditEvent('đổi giá món', [name + ': ' + fmtMoney(_oldItem.price) + 'đ → ' + fmtMoney(price) + 'đ']);
@@ -7043,6 +7158,7 @@ function escHtmlOnline(t) {
       document.getElementById('menu-item-category').value = item.category || 'Cuốn';
       document.getElementById('menu-form-title').innerText = '✏️ Sửa Món: ' + item.name;
       document.getElementById('menu-item-desc').value = item.desc || '';
+      document.getElementById('menu-item-label-note').value = item.labelNote || '';
       pendingMenuImage = null;
       document.getElementById('menu-item-image-file').value = '';
       const pv = document.getElementById('menu-item-image-preview');
@@ -7060,6 +7176,7 @@ function escHtmlOnline(t) {
       document.getElementById('menu-item-app-price').value = '';
       document.getElementById('menu-form-title').innerText = '➕ Thêm / Cập nhật Món';
       document.getElementById('menu-item-desc').value = '';
+      document.getElementById('menu-item-label-note').value = '';
       pendingMenuImage = null;
       document.getElementById('menu-item-image-file').value = '';
       const pv = document.getElementById('menu-item-image-preview');
